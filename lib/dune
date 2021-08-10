@@ -1,0 +1,9 @@
+(library
+ (name Lua_lib)
+ (public_name Lua.Lib)
+ (modules Ast)
+ (modules_without_implementation ast)
+ (inline_tests)
+ (libraries base)
+ (preprocess
+  (pps ppx_expect)))
