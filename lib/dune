@@ -1,9 +1,8 @@
 (library
- (name Lua_lib)
+ (name lua_lib)
  (public_name Lua.Lib)
- (modules Ast)
- (modules_without_implementation ast)
+ (modules Ast Parser)
  (inline_tests)
- (libraries base)
+ (libraries opal base)
  (preprocess
-  (pps ppx_expect)))
+  (pps ppx_expect ppx_deriving.show ppx_deriving.ord)))
