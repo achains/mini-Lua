@@ -8,13 +8,8 @@ type value =
   | VInt of int 
   | VFloat of float
   | VString of string
-  | VTable of table_ref
+  | VTable of expr list
   | VFunction of function_ref
-[@@deriving show { with_path = false }]
-
-and table_ref = 
-  | NillTable
-  | ConsTable of expr list  
 [@@deriving show { with_path = false }]
 
 and function_ref = 
@@ -49,7 +44,8 @@ type statement =
    | If of expr * statement * statement option
    | While of expr * statement 
    | Break 
-   | Continue 
-   | Return of expr option
+   | Return of expr
    | VarDec of (name * expr option) list 
+   | Expression of expr
+   | Block of statement
 [@@deriving show { with_path = false }]
