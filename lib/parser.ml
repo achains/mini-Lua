@@ -135,16 +135,76 @@ end
 
 module PStatement = struct
   open PExpression
-  let end_block = token "end" <|> token "else"
-  let break_stmt = token "break" >> end_block >> return Break
+  let end_token = token "end" <|> token "else"
+  let break_stmt = token "break" >> end_token >> return Break
   
   let return_stmt = 
-      (token "return" >> expr >>= fun e -> end_block >> return (Return e)) <|>
-      (token "return" >> end_block >> return (Return Null))
+      (token "return" >> expr >>= fun e -> end_token >> return (Return e)) <|>
+      (token "return" >> end_token >> return (Return Null))
 
   
   let%test _ = apply return_stmt "return a end" =  Some (Return(Var "a"))
   let%test _ = apply return_stmt "return end" = Some (Return Null)
   let%test _ = apply break_stmt "break end" = Some (Break)
   let%test _ = apply break_stmt "break a = 5 end" = None
+
+  let rec stmt input = 
+    choice 
+      [
+        var_dec_stmt;
+        break_stmt;
+        return_stmt;
+        (* if_stmt; *)
+        while_stmt;
+        for_num_stmt; 
+        expr_stmt; 
+        block_stmt
+      ]
+      input
+
+  and var_dec_stmt input = 
+    (sep_by ident (token ",") >>= fun vars -> 
+     token "=" >> sep_by expr (token ",") >>= fun values ->
+     return (VarDec(var_zipper vars values))  ) input
+  
+  and var_zipper l1 l2 = 
+    let rec helper l1 l2 acc = 
+      match l1, l2 with
+        | [], [] -> acc
+        | hd1::tl1, hd2::tl2 -> (hd1, hd2) :: (helper tl1 tl2 acc)
+        | hd1::tl1, [] -> (hd1, Null) :: (helper tl1 [] acc)
+        | [], _::_ -> acc
+    in 
+    helper l1 l2 []
+  
+  and block_stmt input =
+    (token "do" >> stmt >>= fun body ->
+     token "end" >> return (Block(body))) input 
+  
+  and expr_stmt input = 
+      (expr >>= fun e -> return (Expression e)) input
+  
+  and while_stmt input = 
+    (token "while" >> expr >>= fun condition -> 
+     block_stmt >>= fun body ->  return (While (condition, body))) input
+  
+  and for_num_stmt input = 
+    (token "for" >> ident >>= fun var -> 
+     token "=" >> sep_by1 expr (token ",") >>= function 
+     | conds when List.length conds > 3 || List.length conds < 2  -> mzero
+     | conds -> block_stmt >>= fun body -> return (ForNumerical(Var(var), conds, body))) input
+
+   let%test _ = apply var_dec_stmt "a, b = 1, 2" = Some(VarDec(["a", Const(VInt 1); "b", Const(VInt 2)]))
+   let%test _ = apply var_dec_stmt "a, b = 1" = Some(VarDec(["a", Const(VInt 1); "b", Null]))
+   let%test _ = apply var_dec_stmt "a = 1, 2" = Some(VarDec(["a", Const(VInt 1)]))
+
+   let%test _ = apply block_stmt "do a = 1, 2 end" = Some(Block(VarDec(["a", Const(VInt 1)])))
+   let%test _ = apply expr_stmt "a = 3" = Some(Expression(Assign(Var("a"), Const(VInt 3))))
+   let%test _ = apply while_stmt "while a == true do a = false end" = 
+    Some (While ((Eq ((Var "a"), (Const (VBool true))), (Block (VarDec [("a", (Const (VBool false)))])))))
+    
+   let%test _ = apply for_num_stmt "for i = 1,5,2 do 1 end" =
+    Some (ForNumerical (Var("i"), [Const(VInt(1)); Const(VInt(5)); Const(VInt(2))], Block(Expression(Const(VInt 1)))))
+
+   let%test _ = apply for_num_stmt "for i = 1 do 1 end" = None
 end

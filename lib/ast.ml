@@ -1,8 +1,5 @@
 exception Unbound_Variable of string
 
-type name = Name of string
-[@@deriving show { with_path = false }]
-
 type value =
   | VBool of bool
   | VInt of int 
@@ -43,9 +40,10 @@ and expr =
 type statement =
    | If of expr * statement * statement option
    | While of expr * statement 
+   | ForNumerical of expr * expr list * statement (* for a = 1, 5, 2 -- *)
    | Break 
    | Return of expr
-   | VarDec of (name * expr option) list 
+   | VarDec of (string * expr) list 
    | Expression of expr
    | Block of statement
 [@@deriving show { with_path = false }]
