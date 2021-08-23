@@ -135,18 +135,16 @@ end
 
 module PStatement = struct
   open PExpression
-  let end_token = token "end" <|> token "else"
-  let break_stmt = token "break" >> end_token >> return Break
+  let break_stmt = token "break" >> return Break
   
   let return_stmt = 
-      (token "return" >> expr >>= fun e -> end_token >> return (Return e)) <|>
-      (token "return" >> end_token >> return (Return Null))
+      (token "return" >> expr >>= fun e -> return (Return e)) <|>
+      (token "return" >> return (Return Null))
 
   
-  let%test _ = apply return_stmt "return a end" =  Some (Return(Var "a"))
-  let%test _ = apply return_stmt "return end" = Some (Return Null)
-  let%test _ = apply break_stmt "break end" = Some (Break)
-  let%test _ = apply break_stmt "break a = 5 end" = None
+  let%test _ = apply return_stmt "return a" =  Some (Return(Var "a"))
+  let%test _ = apply return_stmt "return" = Some (Return Null)
+  let%test _ = apply break_stmt "break" = Some (Break)
 
   let rec stmt input = 
     choice 
@@ -154,14 +152,15 @@ module PStatement = struct
         var_dec_stmt;
         break_stmt;
         return_stmt;
-        if_stmt;
+        (* if_stmt; *)
         while_stmt;
         for_num_stmt; 
-        expr_stmt; 
+        expr_stmt;
         block_stmt
       ]
       input
-
+  and block_stmt input = 
+    (token "do" >> sep_by stmt spaces >>= fun body -> token "end" >> return (Block body)) input
   and var_dec_stmt input = 
     (sep_by ident (token ",") >>= fun vars -> 
      token "=" >> sep_by expr (token ",") >>= fun values ->
@@ -177,16 +176,12 @@ module PStatement = struct
     in 
     helper l1 l2 []
   
-  and block_stmt input =
-    (token "do" >> stmt >>= fun body ->
-     token "end" >> return (Block(body))) input 
-  
   and expr_stmt input = 
       (expr >>= fun e -> return (Expression e)) input
   
   and while_stmt input = 
     (token "while" >> expr >>= fun condition -> 
-     block_stmt >>= fun body ->  return (While (condition, body))) input
+     block_stmt >>= fun body -> return (While (condition, body))) input
   
   and for_num_stmt input = 
     (token "for" >> ident >>= fun var -> 
@@ -194,41 +189,52 @@ module PStatement = struct
      | conds when List.length conds > 3 || List.length conds < 2  -> mzero
      | conds -> block_stmt >>= fun body -> return (ForNumerical(Var(var), conds, body))) input
   
-  and if_stmt input = 
-    let elseif_parser input = 
-      ((token "elseif") >> expr >>= fun cond -> (token "then") >> stmt >>= fun body -> return (cond, body)) input
+  (* TODO: Think how to avoid list @ concat *)
+  and if_stmt input =
+    let elseif_stmt input = 
+      (token "elseif" >> expr >>= fun cond ->
+       token "then" >> (sep_by stmt spaces) >>= fun elseif_body ->
+       return (cond, Block(elseif_body))) input
     in
-    let else_parser input = 
-      ((token "else") >> stmt >>= fun body -> return (Const(VBool true), body)) input
+    let else_stmt result input = 
+      (token "else" >> (sep_by stmt spaces) >>= fun else_body ->
+       return (result @ [Const(VBool(true)), Block(else_body)])) input
     in
-    ((token "if") >> expr >>= fun cond -> (token "then") >> stmt >>= fun body ->
-      many (elseif_parser <|> else_parser) >>= fun if_list -> token ("end") >> 
-      return (If((cond, body)::if_list))) input
+    (token "if" >> expr >>= fun cond ->
+     token "then" >> (sep_by stmt spaces) >>= fun if_body ->
+     many elseif_stmt >>= fun elseif_stmt_list ->
+     let result = (cond, Block(if_body))::elseif_stmt_list in
+     (else_stmt result >>= fun r -> token "end" >> return (If r)) <|> (token "end" >> return (If result))) input
+
+  and func_stmt input = 
+    (token "function" >> ident >>= fun func_name -> 
+     token "(" >> sep_by ident (token ",") >>= fun args -> 
+     token ")" >> sep_by stmt spaces >>= fun body -> print_string(show_statement (FuncDec(func_name, args, Block body))); token "end" >> return (FuncDec(func_name, args, Block body))) input
 
    let%test _ = apply var_dec_stmt "a, b = 1, 2" = Some(VarDec(["a", Const(VInt 1); "b", Const(VInt 2)]))
    let%test _ = apply var_dec_stmt "a, b = 1" = Some(VarDec(["a", Const(VInt 1); "b", Null]))
    let%test _ = apply var_dec_stmt "a = 1, 2" = Some(VarDec(["a", Const(VInt 1)]))
 
-   let%test _ = apply block_stmt "do a = 1, 2 end" = Some(Block(VarDec(["a", Const(VInt 1)])))
+   let%test _ = apply block_stmt "do a = 1, 2 end" = Some(Block([VarDec(["a", Const(VInt 1)])]))
    let%test _ = apply expr_stmt "a = 3" = Some(Expression(Assign(Var("a"), Const(VInt 3))))
    let%test _ = apply while_stmt "while a == true do a = false end" = 
-    Some (While ((Eq ((Var "a"), (Const (VBool true))), (Block (VarDec [("a", (Const (VBool false)))])))))
+    Some (While ((Eq ((Var "a"), (Const (VBool true))), (Block ([VarDec [("a", (Const (VBool false)))]])))))
     
-   let%test _ = apply for_num_stmt "for i = 1,5,2 do 1 end" =
-    Some (ForNumerical (Var("i"), [Const(VInt(1)); Const(VInt(5)); Const(VInt(2))], Block(Expression(Const(VInt 1)))))
+   let%test _ = apply for_num_stmt "for i = 1,5,2 do 1 2 end" = 
+    Some (ForNumerical (Var("i"), [Const(VInt(1)); Const(VInt(5)); Const(VInt(2))], Block [(Expression (Const (VInt 1))); (Expression (Const (VInt 2)))]))
 
    let%test _ = apply for_num_stmt "for i = 1 do 1 end" = None
 
-   let%test _ = apply if_stmt "if true then false elseif false then false else false end" = 
-    Some (If([Const(VBool(true)), Expression(Const(VBool(false))); 
-              Const(VBool(false)), Expression(Const(VBool(false)));
-              Const(VBool(true)), Expression(Const(VBool(false)))]))
+   let%test _ = apply if_stmt "if true then false elseif false then true false else false end" = 
+    Some (If([Const(VBool true), Block([Expression(Const(VBool false))]); 
+              Const(VBool false), Block([Expression(Const(VBool true)); Expression(Const(VBool false))]); 
+              Const(VBool true), Block([Expression(Const(VBool false))])]))
    
-  let%test _ = apply if_stmt "if true then false" = None
-  let%test _ = apply if_stmt "if true then false else true end" =
-    Some (If([Const(VBool true), Expression(Const(VBool false)); Const(VBool true), Expression(Const(VBool true))]))
+  let%test _ = apply if_stmt "if true then false" = None 
+  let%test _ = apply if_stmt "if true then false elseif false then false end" = 
+    Some (If([Const(VBool true), Block([Expression(Const(VBool false))]); Const(VBool false), Block([Expression(Const(VBool false))])]))
+  let%test _ = apply if_stmt "if true then false else false elseif true then false end" = None
   
-  let%test _ = apply if_stmt "if a == 5 then f(x) elseif a == 6 then g(y) end" =
-    Some (If([Eq(Var "a", Const(VInt 5)), Expression(CallFunc(Var "f", [Var "x"])); 
-              Eq(Var "a", Const(VInt 6)), Expression(CallFunc(Var "g", [Var "y"]))]))
+  let%test _ = apply func_stmt "function a(x, y) return x + y end" = 
+  Some (FuncDec ("a", ["x"; "y"], (Block [(Return (Sum ((Var "x"), (Var "y"))))])))
 end

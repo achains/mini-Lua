@@ -6,12 +6,6 @@ type value =
   | VFloat of float
   | VString of string
   | VTable of expr list
-  | VFunction of function_ref
-[@@deriving show { with_path = false }]
-
-and function_ref = 
-  | NilFunction
-  | Function of {func_name : string; args : value list}
 [@@deriving show { with_path = false }]
 
 and expr = 
@@ -39,12 +33,12 @@ and expr =
 
 type statement =
    | If of (expr * statement) list
-   | ElseCond 
    | While of expr * statement 
    | ForNumerical of expr * expr list * statement (* for a(expr) = 1, 5, 2 (expr list) do <(statement)> end *)
    | Break 
    | Return of expr
    | VarDec of (string * expr) list 
    | Expression of expr
-   | Block of statement
+   | Block of statement list
+   | FuncDec of string * (string list) * statement (* func_name * args * block *)
 [@@deriving show { with_path = false }]
