@@ -38,9 +38,10 @@ and expr =
 [@@deriving show { with_path = false }]
 
 type statement =
-   | If of expr * statement * statement option
+   | If of (expr * statement) list
+   | ElseCond 
    | While of expr * statement 
-   | ForNumerical of expr * expr list * statement (* for a = 1, 5, 2 -- *)
+   | ForNumerical of expr * expr list * statement (* for a(expr) = 1, 5, 2 (expr list) do <(statement)> end *)
    | Break 
    | Return of expr
    | VarDec of (string * expr) list 

@@ -154,7 +154,7 @@ module PStatement = struct
         var_dec_stmt;
         break_stmt;
         return_stmt;
-        (* if_stmt; *)
+        if_stmt;
         while_stmt;
         for_num_stmt; 
         expr_stmt; 
@@ -193,6 +193,17 @@ module PStatement = struct
      token "=" >> sep_by1 expr (token ",") >>= function 
      | conds when List.length conds > 3 || List.length conds < 2  -> mzero
      | conds -> block_stmt >>= fun body -> return (ForNumerical(Var(var), conds, body))) input
+  
+  and if_stmt input = 
+    let elseif_parser input = 
+      ((token "elseif") >> expr >>= fun cond -> (token "then") >> stmt >>= fun body -> return (cond, body)) input
+    in
+    let else_parser input = 
+      ((token "else") >> stmt >>= fun body -> return (Const(VBool true), body)) input
+    in
+    ((token "if") >> expr >>= fun cond -> (token "then") >> stmt >>= fun body ->
+      many (elseif_parser <|> else_parser) >>= fun if_list -> token ("end") >> 
+      return (If((cond, body)::if_list))) input
 
    let%test _ = apply var_dec_stmt "a, b = 1, 2" = Some(VarDec(["a", Const(VInt 1); "b", Const(VInt 2)]))
    let%test _ = apply var_dec_stmt "a, b = 1" = Some(VarDec(["a", Const(VInt 1); "b", Null]))
@@ -207,4 +218,17 @@ module PStatement = struct
     Some (ForNumerical (Var("i"), [Const(VInt(1)); Const(VInt(5)); Const(VInt(2))], Block(Expression(Const(VInt 1)))))
 
    let%test _ = apply for_num_stmt "for i = 1 do 1 end" = None
+
+   let%test _ = apply if_stmt "if true then false elseif false then false else false end" = 
+    Some (If([Const(VBool(true)), Expression(Const(VBool(false))); 
+              Const(VBool(false)), Expression(Const(VBool(false)));
+              Const(VBool(true)), Expression(Const(VBool(false)))]))
+   
+  let%test _ = apply if_stmt "if true then false" = None
+  let%test _ = apply if_stmt "if true then false else true end" =
+    Some (If([Const(VBool true), Expression(Const(VBool false)); Const(VBool true), Expression(Const(VBool true))]))
+  
+  let%test _ = apply if_stmt "if a == 5 then f(x) elseif a == 6 then g(y) end" =
+    Some (If([Eq(Var "a", Const(VInt 5)), Expression(CallFunc(Var "f", [Var "x"])); 
+              Eq(Var "a", Const(VInt 6)), Expression(CallFunc(Var "g", [Var "y"]))]))
 end
