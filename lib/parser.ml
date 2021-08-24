@@ -163,6 +163,7 @@ module PStatement = struct
   let rec stmt input =
     choice
       [
+        local_stmt;
         var_dec_stmt;
         break_stmt;
         return_stmt;
@@ -186,6 +187,14 @@ module PStatement = struct
     ( token "do" >> sep_by stmt spaces >>= fun body ->
       token "end" >> return (Block body) )
       input
+  
+  and local_stmt input = 
+    ( token "local" >> stmt >>= function 
+        | FuncDec (p1, p2, p3) -> return (Local (FuncDec (p1, p2, p3)))
+        | VarDec p1 -> return (Local (VarDec p1))
+        | Expression (Assign (p1, p2)) -> return (Local (Expression (Assign (p1, p2))))
+        | _ -> mzero
+    ) input
 
   and var_dec_stmt input =
     ( sep_by ident (token ",") >>= fun vars ->

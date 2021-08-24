@@ -132,6 +132,7 @@ let%test _ =
 
 (* Parse all *)
 
+(* factorial.lua *)
 let%test _ =
   apply parse_all
     "\n\
@@ -211,4 +212,39 @@ let%test _ =
                                  [ TableAccess (Var "data", Var "i") ] ) ) );
                      ];
                  ] );
+         ])
+
+(* use_local.lua *)
+let () =
+  print_newline ();
+  print_newline ()
+
+let%test _ =
+  apply parse_all
+    {|  
+x = 10
+
+function xChanger(value)
+    local x = value
+    print(x)
+end 
+
+xChanger(5)
+
+print(x)
+|}
+  = Some
+      (Block
+         [
+           VarDec [ ("x", Const (VInt 10)) ];
+           FuncDec
+             ( "xChanger",
+               [ "value" ],
+               Block
+                 [
+                   Local (VarDec [ ("x", Var "value") ]);
+                   Expression (CallFunc (Var "print", [ Var "x" ]));
+                 ] );
+           Expression (CallFunc (Var "xChanger", [ Const (VInt 5) ]));
+           Expression (CallFunc (Var "print", [ Var "x" ]));
          ])
