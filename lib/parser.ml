@@ -37,12 +37,6 @@ let float_parser =
   exactly '.' >> many digit >>= fun float_part ->
   return (float_of_string (implode (int_part @ ('.' :: float_part))))
 
-let%test _ = apply float_parser "1." = Some 1.
-
-let%test _ = apply int_parser "  1" = Some 1
-
-let%test _ = apply float_parser ".15" = None
-
 module PExpression = struct
   let initial = letter <|> exactly '_'
 
@@ -53,12 +47,7 @@ module PExpression = struct
     | s when List.mem s reserved -> mzero
     | s -> return s
 
-  let%test _ = apply ident "_Test_1_" = Some "_Test_1_"
-
-  let%test _ = apply ident "if" = None
-
-  let%test _ = apply ident "123Test" = None
-
+  (* Atomic expressions *)
   let const_int = int_parser >>= fun n -> return (Const (VInt n))
 
   let const_float = float_parser >>= fun n -> return (Const (VFloat n))
@@ -82,21 +71,6 @@ module PExpression = struct
     in
     token "\"" >> many (satisfy (fun c -> c != '\"')) >>= fun list ->
     token "\"" >> return (Const (VString (string_of_chars list)))
-
-  let%test _ = apply const_number "1.15" = Some (Const (VFloat 1.15))
-
-  let%test _ = apply const_number " .15" = None
-
-  let%test _ = apply const_number "  3" = Some (Const (VInt 3))
-
-  let%test _ = apply const_bool "true  " = Some (Const (VBool true))
-
-  let%test _ = apply const_null "nil" = Some Null
-
-  let%test _ =
-    apply const_string "\" sample \"" = Some (Const (VString " sample "))
-
-  let%test _ = apply const_string "\"\"" = Some (Const (VString ""))
 
   (* Arithmetic operators *)
   let add_op = token "+" >> return (fun x y -> Sum (x, y))
@@ -129,14 +103,12 @@ module PExpression = struct
 
   let not_op = token "not" >> return (fun x -> Not x)
 
-  let atomic =
-    const_var <|> const_number <|> const_string <|> const_bool <|> const_null
-
+  (* Expression parser *)
   let rec expr input = (chainl1 and_expr or_op) input
 
-  and and_expr input = (chainl1 test_expr and_op) input
+  and and_expr input = (chainl1 relational_expr and_op) input
 
-  and test_expr input =
+  and relational_expr input =
     (chainl1 add_expr
        (leq_op <|> geq_op <|> le_op <|> ge_op <|> eq_op <|> neq_op))
       input
@@ -153,11 +125,22 @@ module PExpression = struct
       input
 
   and primary input =
-    (assign <|> parens expr <|> create_table <|> call_func <|> atomic) input
+    (assign <|> parens expr <|> create_table <|> call_func <|> table_access
+   <|> atomic)
+      input
+
+  and atomic =
+    const_var <|> const_number <|> const_string <|> const_bool <|> const_null
 
   and create_table input =
     ( token "{" >> sep_by1 expr (token ",") >>= fun table_elems ->
       token "}" >> return (Const (VTable table_elems)) )
+      input
+
+  and table_access input =
+    ( ident >>= fun table_name ->
+      token "[" >> expr >>= fun pos ->
+      token "]" >> return (TableAccess (Var table_name, pos)) )
       input
 
   and call_func input =
@@ -171,56 +154,33 @@ module PExpression = struct
     ( get_lhs >>= fun lhs ->
       token "=" >> expr >>= fun rhs -> return (Assign (lhs, rhs)) )
       input
-
-  let%test _ =
-    apply create_table "{a = 5}"
-    = Some (Const (VTable [ Assign (Var "a", Const (VInt 5)) ]))
-
-  let%test _ = apply expr "-5" = Some (Sub (Const (VInt 0), Const (VInt 5)))
-
-  let%test _ = apply expr "a = 5" = Some (Assign (Var "a", Const (VInt 5)))
-
-  let%test _ =
-    apply expr "a = {b = 5}"
-    = Some
-        (Assign (Var "a", Const (VTable [ Assign (Var "b", Const (VInt 5)) ])))
-
-  let%test _ =
-    apply call_func "foo   (a=3, 5)"
-    = Some
-        (CallFunc
-           (Var "foo", [ Assign (Var "a", Const (VInt 3)); Const (VInt 5) ]))
 end
 
 module PStatement = struct
   open PExpression
 
-  let break_stmt = token "break" >> return Break
-
-  let return_stmt =
-    token "return" >> expr
-    >>= (fun e -> return (Return e))
-    <|> (token "return" >> return (Return Null))
-
-  let%test _ = apply return_stmt "return a" = Some (Return (Var "a"))
-
-  let%test _ = apply return_stmt "return" = Some (Return Null)
-
-  let%test _ = apply break_stmt "break" = Some Break
-
+  (* Statement parser *)
   let rec stmt input =
     choice
       [
         var_dec_stmt;
         break_stmt;
         return_stmt;
-        (* if_stmt; *)
+        func_stmt;
+        if_stmt;
         while_stmt;
         for_num_stmt;
         expr_stmt;
         block_stmt;
       ]
       input
+
+  and break_stmt = token "break" >> return Break
+
+  and return_stmt =
+    token "return" >> expr
+    >>= (fun e -> return (Return e))
+    <|> (token "return" >> return (Return Null))
 
   and block_stmt input =
     ( token "do" >> sep_by stmt spaces >>= fun body ->
@@ -253,7 +213,7 @@ module PStatement = struct
   and for_num_stmt input =
     ( token "for" >> ident >>= fun var ->
       token "=" >> sep_by1 expr (token ",") >>= function
-      | conds when List.length conds > 3 || List.length conds < 2 -> mzero
+      | conds when List.length conds < 2 || List.length conds > 3 -> mzero
       | conds ->
           block_stmt >>= fun body ->
           return (ForNumerical (Var var, conds, body)) )
@@ -287,4 +247,8 @@ module PStatement = struct
       token ")" >> sep_by stmt spaces >>= fun body ->
       token "end" >> return (FuncDec (func_name, args, Block body)) )
       input
+
+  (* Lua-program parser *)
+  let parse_all input =
+    (sep_by stmt spaces >>= fun result -> return (Block result)) input
 end

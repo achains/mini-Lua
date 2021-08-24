@@ -12,6 +12,3 @@ s = 0
 for i = 1,7 do
     s = s + fact(data[i])
 end
-
--- AST for this code should look like this: 
--- Function(["n"], If(Eq(Var("n"), Num(0)), Ret(Num(1)) ))
