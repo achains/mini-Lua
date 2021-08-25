@@ -16,6 +16,7 @@ and expr =
   | Mul of expr * expr
   | Div of expr * expr  (* Integer division, '//'*)
   | FDiv of expr * expr (* Float division, '/' *)
+  | Mod of expr * expr  (* Modulo, '%' *)
   | And of expr * expr 
   | Or of expr * expr
   | Not of expr
@@ -38,7 +39,7 @@ type statement =
    | Break 
    | Local of statement
    | Return of expr
-   | VarDec of (string * expr) list 
+   | VarDec of (expr * expr) list 
    | Expression of expr
    | Block of statement list
    | FuncDec of string * (string list) * statement (* func_name * args * block *)

@@ -62,18 +62,18 @@ let%test _ = apply break_stmt "break" = Some Break
 
 let%test _ =
   apply var_dec_stmt "a, b = 1, 2"
-  = Some (VarDec [ ("a", Const (VInt 1)); ("b", Const (VInt 2)) ])
+  = Some (VarDec [ (Var "a", Const (VInt 1)); (Var "b", Const (VInt 2)) ])
 
 let%test _ =
   apply var_dec_stmt "a, b = 1"
-  = Some (VarDec [ ("a", Const (VInt 1)); ("b", Null) ])
+  = Some (VarDec [ (Var "a", Const (VInt 1)); (Var "b", Null) ])
 
 let%test _ =
-  apply var_dec_stmt "a = 1, 2" = Some (VarDec [ ("a", Const (VInt 1)) ])
+  apply var_dec_stmt "a = 1, 2" = Some (VarDec [ (Var "a", Const (VInt 1)) ])
 
 let%test _ =
   apply block_stmt "do a = 1, 2 end"
-  = Some (Block [ VarDec [ ("a", Const (VInt 1)) ] ])
+  = Some (Block [ VarDec [ (Var "a", Const (VInt 1)) ] ])
 
 let%test _ =
   apply expr_stmt "a = 3" = Some (Expression (Assign (Var "a", Const (VInt 3))))
@@ -83,7 +83,7 @@ let%test _ =
   = Some
       (While
          ( Eq (Var "a", Const (VBool true)),
-           Block [ VarDec [ ("a", Const (VBool false)) ] ] ))
+           Block [ VarDec [ (Var "a", Const (VBool false)) ] ] ))
 
 let%test _ =
   apply for_num_stmt "for i = 1,5,2 do 1 2 end"
@@ -175,7 +175,7 @@ let%test _ =
                  ] );
            VarDec
              [
-               ( "data",
+               ( Var "data",
                  Const
                    (VTable
                       [
@@ -188,10 +188,10 @@ let%test _ =
                         Const (VInt 7);
                       ]) );
              ];
-           VarDec [ ("s", Const (VInt 0)) ];
+           VarDec [ (Var "s", Const (VInt 0)) ];
            VarDec
              [
-               ( "s",
+               ( Var "s",
                  Sum
                    ( Var "s",
                      CallFunc (Var "fact", [ TableAccess (Var "data", Var "i") ])
@@ -204,7 +204,7 @@ let%test _ =
                  [
                    VarDec
                      [
-                       ( "s",
+                       ( Var "s",
                          Sum
                            ( Var "s",
                              CallFunc
@@ -236,15 +236,17 @@ print(x)
   = Some
       (Block
          [
-           VarDec [ ("x", Const (VInt 10)) ];
+           VarDec [ (Var "x", Const (VInt 10)) ];
            FuncDec
              ( "xChanger",
                [ "value" ],
                Block
                  [
-                   Local (VarDec [ ("x", Var "value") ]);
+                   Local (VarDec [ (Var "x", Var "value") ]);
                    Expression (CallFunc (Var "print", [ Var "x" ]));
                  ] );
            Expression (CallFunc (Var "xChanger", [ Const (VInt 5) ]));
            Expression (CallFunc (Var "print", [ Var "x" ]));
          ])
+
+let () = print_newline ()

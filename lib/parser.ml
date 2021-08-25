@@ -83,6 +83,8 @@ module PExpression = struct
 
   let div_op = token "//" >> return (fun x y -> Div (x, y))
 
+  let mod_op = token "%" >> return (fun x y -> Mod (x, y))
+
   (* Relational operators *)
   let le_op = token "<" >> return (fun x y -> Le (x, y))
 
@@ -116,7 +118,7 @@ module PExpression = struct
   and add_expr input = (chainl1 mul_expr (add_op <|> sub_op)) input
 
   and mul_expr input =
-    (chainl1 unary_expr (mul_op <|> div_op <|> fdiv_op)) input
+    (chainl1 unary_expr (mul_op <|> mod_op <|> div_op <|> fdiv_op)) input
 
   and unary_expr input =
     (token "-" >> lexeme primary
@@ -150,7 +152,7 @@ module PExpression = struct
       input
 
   and assign input =
-    let get_lhs = const_var in
+    let get_lhs = table_access <|> const_var in
     ( get_lhs >>= fun lhs ->
       token "=" >> expr >>= fun rhs -> return (Assign (lhs, rhs)) )
       input
@@ -187,17 +189,18 @@ module PStatement = struct
     ( token "do" >> sep_by stmt spaces >>= fun body ->
       token "end" >> return (Block body) )
       input
-  
-  and local_stmt input = 
-    ( token "local" >> stmt >>= function 
-        | FuncDec (p1, p2, p3) -> return (Local (FuncDec (p1, p2, p3)))
-        | VarDec p1 -> return (Local (VarDec p1))
-        | Expression (Assign (p1, p2)) -> return (Local (Expression (Assign (p1, p2))))
-        | _ -> mzero
-    ) input
+
+  and local_stmt input =
+    (token "local" >> stmt >>= function
+     | FuncDec (p1, p2, p3) -> return (Local (FuncDec (p1, p2, p3)))
+     | VarDec p1 -> return (Local (VarDec p1))
+     | Expression (Assign (p1, p2)) ->
+         return (Local (Expression (Assign (p1, p2))))
+     | _ -> mzero)
+      input
 
   and var_dec_stmt input =
-    ( sep_by ident (token ",") >>= fun vars ->
+    ( sep_by (table_access <|> const_var) (token ",") >>= fun vars ->
       token "=" >> sep_by expr (token ",") >>= fun values ->
       return (VarDec (var_zipper vars values)) )
       input
@@ -259,5 +262,8 @@ module PStatement = struct
 
   (* Lua-program parser *)
   let parse_all input =
-    (sep_by stmt spaces >>= fun result -> return (Block result)) input
+    ( sep_by stmt spaces >>= fun result ->
+      print_string (show_statement (Block result));
+      return (Block result) )
+      input
 end
