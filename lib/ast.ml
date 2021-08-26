@@ -1,35 +1,32 @@
 exception Unbound_Variable of string
 
+type arop = Sum | Sub | Mul | Div | FDiv | Mod [@@deriving show { with_path = false }]
+
+type logop = And | Or [@@deriving show { with_path = false }]
+
+type unop = Not [@@deriving show { with_path = false }]
+
+type relop = Eq | Neq | Le | Leq | Ge | Geq [@@deriving show { with_path = false }]
+
 type value =
   | VBool of bool
   | VInt of int 
   | VFloat of float
   | VString of string
   | VTable of expr list
+  | VNull
 [@@deriving show { with_path = false }]
 
 and expr = 
   | Const of value
   | Var of string 
-  | Sum of expr * expr 
-  | Sub of expr * expr 
-  | Mul of expr * expr
-  | Div of expr * expr  (* Integer division, '//'*)
-  | FDiv of expr * expr (* Float division, '/' *)
-  | Mod of expr * expr  (* Modulo, '%' *)
-  | And of expr * expr 
-  | Or of expr * expr
-  | Not of expr
-  | Eq of expr * expr
-  | Neq of expr * expr 
-  | Le of expr * expr 
-  | Leq of expr * expr
-  | Ge of expr * expr 
-  | Geq of expr * expr 
+  | ArOp of arop * expr * expr
+  | LogOp of logop * expr * expr 
+  | UnOp of unop * expr
+  | RelOp of relop * expr * expr
   | TableAccess of expr * expr 
   | CallFunc of expr * expr list
   | Assign of expr * expr
-  | Null
 [@@deriving show { with_path = false }]
 
 type statement =

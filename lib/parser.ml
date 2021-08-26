@@ -59,7 +59,7 @@ module PExpression = struct
     >> return (Const (VBool true))
     <|> (token "false" >> return (Const (VBool false)))
 
-  let const_null = token "nil" >> return Null
+  let const_null = token "nil" >> return @@ Const (VNull)
 
   let const_var = ident => fun x -> Var x
 
@@ -73,37 +73,35 @@ module PExpression = struct
     token "\"" >> return (Const (VString (string_of_chars list)))
 
   (* Arithmetic operators *)
-  let add_op = token "+" >> return (fun x y -> Sum (x, y))
+  let add_op = token "+" >> return (fun x y -> ArOp (Sum, x, y))
 
-  let sub_op = token "-" >> return (fun x y -> Sub (x, y))
+  let sub_op = token "-" >> return (fun x y -> ArOp (Sub, x, y))
 
-  let mul_op = token "*" >> return (fun x y -> Mul (x, y))
+  let mul_op = token "*" >> return (fun x y -> ArOp (Mul, x, y))
 
-  let fdiv_op = token "/" >> return (fun x y -> FDiv (x, y))
+  let fdiv_op = token "/" >> return (fun x y -> ArOp (FDiv, x, y))
 
-  let div_op = token "//" >> return (fun x y -> Div (x, y))
+  let div_op = token "//" >> return (fun x y -> ArOp (Div, x, y))
 
-  let mod_op = token "%" >> return (fun x y -> Mod (x, y))
+  let mod_op = token "%" >> return (fun x y -> ArOp (Mod, x, y))
 
   (* Relational operators *)
-  let le_op = token "<" >> return (fun x y -> Le (x, y))
+  let le_op = token "<" >> return (fun x y -> RelOp (Le, x, y))
 
-  let leq_op = token "<=" >> return (fun x y -> Leq (x, y))
+  let leq_op = token "<=" >> return (fun x y -> RelOp (Leq, x, y))
 
-  let ge_op = token ">" >> return (fun x y -> Ge (x, y))
+  let ge_op = token ">" >> return (fun x y -> RelOp (Ge, x, y))
 
-  let geq_op = token ">=" >> return (fun x y -> Geq (x, y))
+  let geq_op = token ">=" >> return (fun x y -> RelOp (Geq, x, y))
 
-  let eq_op = token "==" >> return (fun x y -> Eq (x, y))
+  let eq_op = token "==" >> return (fun x y -> RelOp (Eq, x, y))
 
-  let neq_op = token "~=" >> return (fun x y -> Neq (x, y))
+  let neq_op = token "~=" >> return (fun x y -> RelOp (Neq, x, y))
 
   (* Logical operators *)
-  let and_op = token "and" >> return (fun x y -> And (x, y))
+  let and_op = token "and" >> return (fun x y -> LogOp (And, x, y))
 
-  let or_op = token "or" >> return (fun x y -> Or (x, y))
-
-  let not_op = token "not" >> return (fun x -> Not x)
+  let or_op = token "or" >> return (fun x y -> LogOp (Or, x, y))
 
   (* Expression parser *)
   let rec expr input = (chainl1 and_expr or_op) input
@@ -122,7 +120,8 @@ module PExpression = struct
 
   and unary_expr input =
     (token "-" >> lexeme primary
-    >>= (fun x -> return (Sub (Const (VInt 0), x)))
+    >>= (fun x -> return (ArOp (Sub, Const (VInt 0), x)))
+    <|> (token "not" >> lexeme primary >>= fun x -> return (UnOp (Not, x)))
     <|> primary)
       input
 
@@ -183,7 +182,7 @@ module PStatement = struct
   and return_stmt =
     token "return" >> expr
     >>= (fun e -> return (Return e))
-    <|> (token "return" >> return (Return Null))
+    <|> (token "return" >> return (Return  (Const VNull)))
 
   and block_stmt input =
     ( token "do" >> sep_by stmt spaces >>= fun body ->
@@ -210,7 +209,7 @@ module PStatement = struct
       match (l1, l2) with
       | [], [] -> acc
       | hd1 :: tl1, hd2 :: tl2 -> (hd1, hd2) :: helper tl1 tl2 acc
-      | hd1 :: tl1, [] -> (hd1, Null) :: helper tl1 [] acc
+      | hd1 :: tl1, [] -> (hd1, Const VNull) :: helper tl1 [] acc
       | [], _ :: _ -> acc
     in
     helper l1 l2 []
