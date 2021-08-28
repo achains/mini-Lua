@@ -8,23 +8,26 @@ type unop = Not [@@deriving show { with_path = false }]
 
 type relop = Eq | Neq | Le | Leq | Ge | Geq [@@deriving show { with_path = false }]
 
+type name = string [@@deriving show { with_path = false}]
+
 type value =
   | VBool of bool
   | VInt of int 
   | VFloat of float
   | VString of string
-  | VTable of expr list
+  | VTable of (name * value) list
   | VNull
 [@@deriving show { with_path = false }]
 
-and expr = 
+type expr = 
   | Const of value
-  | Var of string 
+  | Var of name 
   | ArOp of arop * expr * expr
   | LogOp of logop * expr * expr 
   | UnOp of unop * expr
   | RelOp of relop * expr * expr
   | TableAccess of expr * expr 
+  | TableCreate of expr list
   | CallFunc of expr * expr list
   | Assign of expr * expr
 [@@deriving show { with_path = false }]
@@ -39,5 +42,5 @@ type statement =
    | VarDec of (expr * expr) list 
    | Expression of expr
    | Block of statement list
-   | FuncDec of string * (string list) * statement (* func_name * args * block *)
+   | FuncDec of name * (name list) * statement (* func_name * args * block *)
 [@@deriving show { with_path = false }]

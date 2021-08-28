@@ -34,7 +34,7 @@ let%test _ = apply const_string "\"\"" = Some (Const (VString ""))
 
 let%test _ =
   apply create_table "{a = 5}"
-  = Some (Const (VTable [ Assign (Var "a", Const (VInt 5)) ]))
+  = Some (TableCreate [ Assign (Var "a", Const (VInt 5)) ])
 
 let%test _ =
   apply table_access "data[3]" = Some (TableAccess (Var "data", Const (VInt 3)))
@@ -45,7 +45,7 @@ let%test _ = apply expr "a = 5" = Some (Assign (Var "a", Const (VInt 5)))
 
 let%test _ =
   apply expr "a = {b = 5}"
-  = Some (Assign (Var "a", Const (VTable [ Assign (Var "b", Const (VInt 5)) ])))
+  = Some (Assign (Var "a", TableCreate [ Assign (Var "b", Const (VInt 5)) ]))
 
 let%test _ =
   apply call_func "foo   (a=3, 5)"
@@ -168,11 +168,10 @@ let%test _ =
       ));
     (VarDec
        [((Var "data"),
-         (Const
-            (VTable
+         (TableCreate
                [(Const (VInt 1)); (Const (VInt 2)); (Const (VInt 3));
                  (Const (VInt 4)); (Const (VInt 5)); (Const (VInt 6));
-                 (Const (VInt 7))])))
+                 (Const (VInt 7))]))
          ]);
     (VarDec [((Var "s"), (Const (VInt 0)))]);
     (VarDec

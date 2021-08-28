@@ -135,7 +135,7 @@ module PExpression = struct
 
   and create_table input =
     ( token "{" >> sep_by1 expr (token ",") >>= fun table_elems ->
-      token "}" >> return (Const (VTable table_elems)) )
+      token "}" >> return (TableCreate table_elems) )
       input
 
   and table_access input =
@@ -262,7 +262,7 @@ module PStatement = struct
   (* Lua-program parser *)
   let parse_all input =
     ( sep_by stmt spaces >>= fun result ->
-      print_string (show_statement (Block result));
+      (* print_string (show_statement (Block result)); *)
       return (Block result) )
       input
 end
