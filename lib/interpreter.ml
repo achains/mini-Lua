@@ -113,9 +113,9 @@ module Eval (M : MONADERROR) = struct
     and env_lst = enviroment list
 
     let rec find_var varname = function
-      | [] -> error "Variable not found"
+      | [] -> return @@ VNull
       | hd :: tl -> (
-          match Hashtbl.find_opt hd varname with
+          match Hashtbl.find_opt hd.var_ht varname with
           | Some (Const v) -> return @@ v
           | Some _ -> error "Invalid enviroment value"
           | None -> find_var varname tl)
@@ -153,12 +153,12 @@ module Eval (M : MONADERROR) = struct
     | UnOp (_, x) ->
         eval_expr env x >>= fun e_x -> return @@ VBool (not (is_true e_x))
     | Var v -> Env.find_var v env
-    | TableCreate _ -> return @@ VInt 1
-    | TableAccess (_, _) -> return @@ VInt 1
+    | TableCreate el -> table_create env el
+    | TableAccess (tname, texpr) -> table_find env tname texpr
     | CallFunc (_, _) -> return @@ VInt 1
     | _ -> error "Unexpected expression"
 
-  and append_table ht env key = function
+  and table_append ht env key = function
     | [] -> return @@ VTable ht
     | hd :: tl -> (
         match hd with
@@ -166,13 +166,26 @@ module Eval (M : MONADERROR) = struct
             eval_expr env x >>= fun lhs ->
             eval_expr env y >>= fun rhs ->
             Hashtbl.replace ht (string_of_value lhs) rhs;
-            append_table ht env key tl
+            table_append ht env key tl
         | _ ->
             eval_expr env hd >>= fun v ->
             Hashtbl.replace ht (string_of_int key) v;
-            append_table ht env (key + 1) tl)
+            table_append ht env (key + 1) tl)
 
-  and create_table env elist =
+  and table_create env elist =
     let ht = Hashtbl.create 100 in
-    append_table ht env 0 elist
+    table_append ht env 1 elist
+
+  and table_find env tname texpr =
+    let find_opt ht key =
+      match Hashtbl.find_opt ht key with
+         | Some v -> return @@ v
+         | None -> return @@ VNull
+    in 
+    Env.find_var tname env >>= function
+     | VTable ht -> eval_expr env texpr >>= (function
+         | VInt key -> find_opt ht (string_of_int key)
+         | VString key -> find_opt ht key
+         | _ -> error "Invalid key value")
+     | _ -> error "Attemt to index non-table value"
 end

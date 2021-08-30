@@ -37,7 +37,7 @@ let%test _ =
   = Some (TableCreate [ Assign (Var "a", Const (VInt 5)) ])
 
 let%test _ =
-  apply table_access "data[3]" = Some (TableAccess (Var "data", Const (VInt 3)))
+  apply table_access "data[3]" = Some (TableAccess ("data", Const (VInt 3)))
 
 let%test _ = apply expr "-5" = Some (ArOp(Sub , Const (VInt 0), Const (VInt 5)))
 
@@ -178,7 +178,7 @@ let%test _ =
        [((Var "s"),
          (ArOp (Sum, (Var "s"),
             (CallFunc ((Var "fact"),
-               [(TableAccess ((Var "data"), (Var "i")))]))
+               [(TableAccess (("data"), (Var "i")))]))
             )))
          ]);
     (ForNumerical ((Var "i"), [(Const (VInt 1)); (Const (VInt 7))],
@@ -187,7 +187,7 @@ let%test _ =
               [((Var "s"),
                 (ArOp (Sum, (Var "s"),
                    (CallFunc ((Var "fact"),
-                      [(TableAccess ((Var "data"), (Var "i")))]))
+                      [(TableAccess (("data"), (Var "i")))]))
                    )))
                 ])
             ])

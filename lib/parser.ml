@@ -141,7 +141,7 @@ module PExpression = struct
   and table_access input =
     ( ident >>= fun table_name ->
       token "[" >> expr >>= fun pos ->
-      token "]" >> return (TableAccess (Var table_name, pos)) )
+      token "]" >> return (TableAccess (table_name, pos)) )
       input
 
   and call_func input =

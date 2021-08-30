@@ -15,9 +15,9 @@ type value =
   | VInt of int 
   | VFloat of float
   | VString of string
-  | VTable of (name * value) list
+  | VTable of (name, value) Hashtbl.t
   | VNull
-[@@deriving show { with_path = false }]
+(* [@@deriving show { with_path = false }] *)
 
 type expr = 
   | Const of value
@@ -26,11 +26,11 @@ type expr =
   | LogOp of logop * expr * expr 
   | UnOp of unop * expr
   | RelOp of relop * expr * expr
-  | TableAccess of expr * expr 
+  | TableAccess of name * expr 
   | TableCreate of expr list
   | CallFunc of expr * expr list
   | Assign of expr * expr
-[@@deriving show { with_path = false }]
+(* [@@deriving show { with_path = false }] *)
 
 type statement =
    | If of (expr * statement) list
@@ -43,4 +43,4 @@ type statement =
    | Expression of expr
    | Block of statement list
    | FuncDec of name * (name list) * statement (* func_name * args * block *)
-[@@deriving show { with_path = false }]
+(* [@@deriving show { with_path = false }] *)

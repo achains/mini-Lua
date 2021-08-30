@@ -12,6 +12,8 @@ depends: [
   "ocaml" {>= "4.04.1"}
   #"base"
   "ppx_expect"
+  "ppx_deriving"
+  "ppx_show"
   "dune"
   "opal"
   "ocamlformat" { build }
