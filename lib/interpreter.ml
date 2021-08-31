@@ -93,21 +93,20 @@ module Eval (M : MONADERROR) = struct
   (* ==== Enviroment ==== *)
 
   module Env = struct
-    type name = string [@@deriving show {with_path= false}]
-    type variables = (name, expr) Hashtbl.t
+    type variables = (name, value) Hashtbl.t
 
-    type enviroment = {var_ht: variables; func_ht: variables}
-
-    and env_lst = enviroment list
+    type enviroment =
+      {vars: variables; last_value: value; prev_env: enviroment option}
 
     let rec find_var varname = function
-      | [] -> return @@ VNull
-      | hd :: tl -> (
-        match Hashtbl.find_opt hd.var_ht varname with
-        | Some (Const v) -> return @@ v
-        | Some _ -> error "Invalid enviroment value"
-        | None -> find_var varname tl )
+      | None -> return @@ VNull
+      | Some env -> (
+        match Hashtbl.find_opt env.vars varname with
+        | Some v -> return @@ v
+        | None -> find_var varname env.prev_env )
   end
+
+  open Env
 
   let rec eval_expr env = function
     | Const v -> return v
@@ -145,7 +144,7 @@ module Eval (M : MONADERROR) = struct
     | Var v -> Env.find_var v env
     | TableCreate el -> table_create env el
     | TableAccess (tname, texpr) -> table_find env tname texpr
-    | CallFunc (_, _) -> return @@ VInt 1
+    | CallFunc (_, _) -> return @@ VBool true
     | _ -> error "Unexpected expression"
 
   and table_append ht env key = function
@@ -182,5 +181,61 @@ module Eval (M : MONADERROR) = struct
         | VInt key -> find_opt ht (string_of_int key)
         | VString key -> find_opt ht key
         | _ -> error "Invalid key value" )
-    | _ -> error "Attemt to index non-table value"
+    | _ -> error "Attempt to index non-table value"
+
+  and func_call env fname fargs =
+    let create_vardec lnames lexprs =
+      let rec helper l1 l2 acc =
+        match (l1, l2) with
+        | [], [] -> acc
+        | hd1 :: tl1, hd2 :: tl2 -> (hd1, hd2) :: helper tl1 tl2 acc
+        | hd1 :: tl1, [] -> (hd1, Const VNull) :: helper tl1 [] acc
+        | [], _ :: _ -> acc in
+      helper lnames lexprs [] in
+    Env.find_var fname env
+    >>= function
+    | VFunction (name_args, body) ->
+        let var_args = List.map (fun x -> Var x) name_args in
+        let block_with_vardec = function
+          | Block b ->
+              return @@ Block (VarDec (create_vardec var_args fargs) :: b)
+          | _ -> error "Expected function body" in
+        block_with_vardec body >>= fun b -> eval_stmt env b
+    | _ -> error "Attempt to call not a function value"
+
+  and eval_stmt env = function
+    | Expression e ->
+        eval_expr env e
+        >>= fun v -> update_last_value v env >>= fun en -> return @@ Some en
+    | VarDec el -> eval_vardec true env el >>= fun _ -> return env
+    | Local (VarDec el) -> eval_vardec false env el >>= fun _ -> return env
+    | FuncDec _ -> return @@ env
+    | Local (FuncDec _) -> return @@ env
+    | Block _ -> return @@ env
+    | _ -> error "Unexpected statement"
+
+  and update_last_value v = function
+    | None -> error "Operation out of scope"
+    | Some env -> return @@ {env with last_value= v}
+
+  and eval_vardec is_global env = function
+    | [] -> return env
+    | hd :: tl -> (
+      match hd with
+      | Var x, e ->
+          eval_expr env e
+          >>= fun v ->
+          assign x v is_global env >>= fun _ -> eval_vardec is_global env tl
+      | _ -> error "Wrong type to assign to" )
+
+  and assign n v is_global env =
+    let rec set_global n v env =
+      match env.prev_env with
+      | None -> Hashtbl.replace env.vars n v
+      | Some pe -> set_global n v pe in
+    match env with
+    | None -> error "Operation out of scope"
+    | Some e ->
+        if is_global then return @@ set_global n v e
+        else return @@ Hashtbl.replace e.vars n v
 end

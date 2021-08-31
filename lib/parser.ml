@@ -114,7 +114,7 @@ module PExpression = struct
     >>= fun func_name ->
     token "("
     >> sep_by expr (token ",")
-    >>= fun args -> token ")" >> return (CallFunc (Var func_name, args)) )
+    >>= fun args -> token ")" >> return (CallFunc (func_name, args)) )
       input
 
   and assign input =

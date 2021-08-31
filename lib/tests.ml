@@ -38,8 +38,7 @@ let%test _ =
 
 let%test _ =
   apply call_func "foo   (a=3, 5)"
-  = Some
-      (CallFunc (Var "foo", [Assign (Var "a", Const (VInt 3)); Const (VInt 5)]))
+  = Some (CallFunc ("foo", [Assign (Var "a", Const (VInt 3)); Const (VInt 5)]))
 
 (* Statement tests *)
 
@@ -146,7 +145,7 @@ let%test _ =
                                   ( Mul
                                   , Var "n"
                                   , CallFunc
-                                      ( Var "fact"
+                                      ( "fact"
                                       , [ArOp (Sub, Var "n", Const (VInt 1))] )
                                   ) ) ] ) ] ] )
          ; VarDec
@@ -160,8 +159,7 @@ let%test _ =
                , ArOp
                    ( Sum
                    , Var "s"
-                   , CallFunc (Var "fact", [TableAccess ("data", Var "i")]) ) )
-             ]
+                   , CallFunc ("fact", [TableAccess ("data", Var "i")]) ) ) ]
          ; ForNumerical
              ( Var "i"
              , [Const (VInt 1); Const (VInt 7)]
@@ -171,9 +169,8 @@ let%test _ =
                        , ArOp
                            ( Sum
                            , Var "s"
-                           , CallFunc
-                               (Var "fact", [TableAccess ("data", Var "i")]) )
-                       ) ] ] ) ] )
+                           , CallFunc ("fact", [TableAccess ("data", Var "i")])
+                           ) ) ] ] ) ] )
 
 (* use_local.lua *)
 let () = print_newline (); print_newline ()
@@ -200,8 +197,41 @@ print(x)
              , ["value"]
              , Block
                  [ Local (VarDec [(Var "x", Var "value")])
-                 ; Expression (CallFunc (Var "print", [Var "x"])) ] )
-         ; Expression (CallFunc (Var "xChanger", [Const (VInt 5)]))
-         ; Expression (CallFunc (Var "print", [Var "x"])) ] )
+                 ; Expression (CallFunc ("print", [Var "x"])) ] )
+         ; Expression (CallFunc ("xChanger", [Const (VInt 5)]))
+         ; Expression (CallFunc ("print", [Var "x"])) ] )
 
-let () = print_newline ()
+let%test _ = 
+  apply parse_all
+    {|
+function binop(x, y, op)
+  local result = op(x, y)
+  return result
+end
+
+function prod(x, y)
+  return x * y
+end
+
+
+a = 5
+b = 4
+print(binop(a, b, prod))    
+|}
+   = Some (Block
+   [(FuncDec ("binop", ["x"; "y"; "op"],
+       (Block
+          [(Local
+              (VarDec
+                 [((Var "result"), (CallFunc ("op", [(Var "x"); (Var "y")])))
+                   ]));
+            (Return (Var "result"))])
+       ));
+     (FuncDec ("prod", ["x"; "y"],
+        (Block [(Return (ArOp (Mul, (Var "x"), (Var "y"))))])));
+     (VarDec [((Var "a"), (Const (VInt 5)))]);
+     (VarDec [((Var "b"), (Const (VInt 4)))]);
+     (Expression
+        (CallFunc ("print",
+           [(CallFunc ("binop", [(Var "a"); (Var "b"); (Var "prod")]))])))
+     ])

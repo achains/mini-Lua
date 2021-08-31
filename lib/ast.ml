@@ -17,10 +17,11 @@ type value =
   | VFloat of float
   | VString of string
   | VTable of (name, value) Hashtbl.t
+  | VFunction of name list * statement
   | VNull
 (* [@@deriving show { with_path = false }] *)
 
-type expr =
+and expr =
   | Const of value
   | Var of name
   | ArOp of arop * expr * expr
@@ -29,11 +30,11 @@ type expr =
   | RelOp of relop * expr * expr
   | TableAccess of name * expr
   | TableCreate of expr list
-  | CallFunc of expr * expr list
+  | CallFunc of name * expr list
   | Assign of expr * expr
 (* [@@deriving show { with_path = false }] *)
 
-type statement =
+and statement =
   | If of (expr * statement) list
   | While of expr * statement
   | ForNumerical of expr * expr list * statement (* for a(expr) = 1, 5, 2 (expr list) do <(statement)> end *)
