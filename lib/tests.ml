@@ -201,7 +201,7 @@ print(x)
          ; Expression (CallFunc ("xChanger", [Const (VInt 5)]))
          ; Expression (CallFunc ("print", [Var "x"])) ] )
 
-let%test _ = 
+let%test _ =
   apply parse_all
     {|
 function binop(x, y, op)
@@ -218,20 +218,33 @@ a = 5
 b = 4
 print(binop(a, b, prod))    
 |}
-   = Some (Block
-   [(FuncDec ("binop", ["x"; "y"; "op"],
-       (Block
-          [(Local
-              (VarDec
-                 [((Var "result"), (CallFunc ("op", [(Var "x"); (Var "y")])))
-                   ]));
-            (Return (Var "result"))])
-       ));
-     (FuncDec ("prod", ["x"; "y"],
-        (Block [(Return (ArOp (Mul, (Var "x"), (Var "y"))))])));
-     (VarDec [((Var "a"), (Const (VInt 5)))]);
-     (VarDec [((Var "b"), (Const (VInt 4)))]);
-     (Expression
-        (CallFunc ("print",
-           [(CallFunc ("binop", [(Var "a"); (Var "b"); (Var "prod")]))])))
-     ])
+  = Some
+      (Block
+         [ FuncDec
+             ( "binop"
+             , ["x"; "y"; "op"]
+             , Block
+                 [ Local
+                     (VarDec
+                        [(Var "result", CallFunc ("op", [Var "x"; Var "y"]))] )
+                 ; Return (Var "result") ] )
+         ; FuncDec
+             ("prod", ["x"; "y"], Block [Return (ArOp (Mul, Var "x", Var "y"))])
+         ; VarDec [(Var "a", Const (VInt 5))]; VarDec [(Var "b", Const (VInt 4))]
+         ; Expression
+             (CallFunc
+                ("print", [CallFunc ("binop", [Var "a"; Var "b"; Var "prod"])])
+             ) ] )
+
+
+(* let%test _ = apply parse_all "5 + 4" = Some (Block [Expression(ArOp(Sum, Const(VInt 5), Const(VInt 4)))])
+let () = print_newline(); print_newline(); print_newline()
+let%test _ = apply parse_all 
+{|
+function foo(x, y)
+   local c = 3
+end
+
+foo()
+c
+|} = None *)

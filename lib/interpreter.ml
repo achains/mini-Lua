@@ -1,4 +1,5 @@
 open Ast
+open Hashtbl_p
 
 module type MONAD = sig
   type 'a t
@@ -88,25 +89,23 @@ module Eval (M : MONADERROR) = struct
     | VFloat v -> string_of_float v
     | VString v -> v
     | VBool v -> string_of_bool v
-    | _ -> failwith "Unsupported type to transform to string"
+    | VTable _ -> "<table>"
+    | VFunction _ -> "<function>"
+    | VNull -> "nil"
 
   (* ==== Enviroment ==== *)
 
-  module Env = struct
-    type variables = (name, value) Hashtbl.t
+  type variables = (name, value) Hashtbl_p.t [@@deriving show {with_path = false}]
 
-    type enviroment =
-      {vars: variables; last_value: value; prev_env: enviroment option}
+  type enviroment =
+    {vars: variables; last_value: value; prev_env: enviroment option} [@@deriving show { with_path = false }]
 
-    let rec find_var varname = function
-      | None -> return @@ VNull
-      | Some env -> (
-        match Hashtbl.find_opt env.vars varname with
-        | Some v -> return @@ v
-        | None -> find_var varname env.prev_env )
-  end
-
-  open Env
+  let rec find_var varname = function
+    | None -> return @@ VNull
+    | Some env -> (
+      match Hashtbl.find_opt env.vars varname with
+      | Some v -> return @@ v
+      | None -> find_var varname env.prev_env )
 
   let rec eval_expr env = function
     | Const v -> return v
@@ -141,10 +140,10 @@ module Eval (M : MONADERROR) = struct
         return @@ VBool ((get_op op) (is_true e_lhs) (is_true e_rhs))
     | UnOp (_, x) ->
         eval_expr env x >>= fun e_x -> return @@ VBool (not (is_true e_x))
-    | Var v -> Env.find_var v env
+    | Var v -> find_var v env
     | TableCreate el -> table_create env el
     | TableAccess (tname, texpr) -> table_find env tname texpr
-    | CallFunc (_, _) -> return @@ VBool true
+    | CallFunc (n, el) -> func_call env n el >>= fun e -> (match e with Some x -> return x.last_value | None -> error "Out of scope" )
     | _ -> error "Unexpected expression"
 
   and table_append ht env key = function
@@ -165,7 +164,7 @@ module Eval (M : MONADERROR) = struct
           table_append ht env (key + 1) tl )
 
   and table_create env elist =
-    let ht = Hashtbl.create 100 in
+    let ht = Hashtbl.create 16 in
     table_append ht env 1 elist
 
   and table_find env tname texpr =
@@ -173,7 +172,7 @@ module Eval (M : MONADERROR) = struct
       match Hashtbl.find_opt ht key with
       | Some v -> return @@ v
       | None -> return @@ VNull in
-    Env.find_var tname env
+    find_var tname env
     >>= function
     | VTable ht -> (
         eval_expr env texpr
@@ -192,7 +191,7 @@ module Eval (M : MONADERROR) = struct
         | hd1 :: tl1, [] -> (hd1, Const VNull) :: helper tl1 [] acc
         | [], _ :: _ -> acc in
       helper lnames lexprs [] in
-    Env.find_var fname env
+    find_var fname env
     >>= function
     | VFunction (name_args, body) ->
         let var_args = List.map (fun x -> Var x) name_args in
@@ -207,19 +206,25 @@ module Eval (M : MONADERROR) = struct
     | Expression e ->
         eval_expr env e
         >>= fun v -> update_last_value v env >>= fun en -> return @@ Some en
-    | VarDec el -> eval_vardec true env el >>= fun _ -> return env
-    | Local (VarDec el) -> eval_vardec false env el >>= fun _ -> return env
-    | FuncDec _ -> return @@ env
-    | Local (FuncDec _) -> return @@ env
-    | Block _ -> return @@ env
+    | VarDec el -> eval_vardec true env el >>= fun _ -> update_last_value VNull env >>= fun en -> return (Some en)
+    | Local (VarDec el) -> eval_vardec false env el >>= fun _ -> update_last_value VNull env >>= fun en -> return (Some en)
+    | FuncDec (n, args, b) ->
+        assign n (VFunction (args, b)) true env >>= fun _ -> update_last_value VNull env >>= fun en -> return @@ Some en
+    | Local (FuncDec (n, args, b)) ->
+        assign n (VFunction (args, b)) false env >>= fun _ -> update_last_value VNull env >>= fun en -> return (Some en)
+    | Block b -> create_next_block env >>= fun e -> eval_block (Some e) b
     | _ -> error "Unexpected statement"
 
   and update_last_value v = function
     | None -> error "Operation out of scope"
     | Some env -> return @@ {env with last_value= v}
+  
+  and create_next_block = function
+    | None -> error "Operation out of scope"
+    | Some env -> return @@ {env with prev_env = Some env; vars = Hashtbl.create 16}
 
   and eval_vardec is_global env = function
-    | [] -> return env
+    | [] -> update_last_value VNull env
     | hd :: tl -> (
       match hd with
       | Var x, e ->
@@ -235,7 +240,28 @@ module Eval (M : MONADERROR) = struct
       | Some pe -> set_global n v pe in
     match env with
     | None -> error "Operation out of scope"
-    | Some e ->
+    | Some e -> (*print_string(show_enviroment e);*)
         if is_global then return @@ set_global n v e
         else return @@ Hashtbl.replace e.vars n v
+
+  and eval_block env = function
+    | [] -> return @@ env
+    | hd :: tl -> eval_stmt env hd >>= fun e -> eval_block e tl
+
+  and eval_prog env = function
+    | None -> return VNull
+    | Some p -> (
+        eval_stmt env p
+        >>= fun en ->
+        match en with
+        | None -> return @@ VNull
+        | Some e -> (*print_string(show_enviroment e);*) return @@ e.last_value )
 end
+
+open Eval (Result)
+
+let eval parsed_prog =
+  let start_env = {vars= Hashtbl.create 16; last_value= VNull; prev_env= None} in
+  match eval_prog (Some start_env) parsed_prog with
+  | Ok res -> print_string (string_of_value res)
+  | Error m -> print_endline m
