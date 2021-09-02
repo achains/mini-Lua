@@ -197,7 +197,7 @@ module Eval (M : MONADERROR) = struct
         let var_args = List.map (fun x -> Var x) name_args in
         let block_with_vardec = function
           | Block b ->
-              return @@ Block (VarDec (create_vardec var_args fargs) :: b)
+              return @@ Block (Local (VarDec (create_vardec var_args fargs)) :: b)
           | _ -> error "Expected function body" in
         block_with_vardec body >>= fun b -> eval_stmt env b
     | _ -> error "Attempt to call not a function value"
