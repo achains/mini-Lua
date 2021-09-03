@@ -3,13 +3,19 @@ open Lua_lib.Interpreter
 
 let parse_result = apply PStatement.parse_all 
 {|
-
-c = 4
-function foo(x, y)
-   local c = 3
+function binop(x, y, op)
+   return op(x, y)
 end
 
-foo()
+function add(x, y)
+   return x + y
+end
+
+function sub(x, y)
+   return x - y
+end
+
+c = binop(3, 7, add)
 c
 |}
 
