@@ -236,15 +236,14 @@ print(binop(a, b, prod))
                 ("print", [CallFunc ("binop", [Var "a"; Var "b"; Var "prod"])])
              ) ] )
 
-
 (* let%test _ = apply parse_all "5 + 4" = Some (Block [Expression(ArOp(Sum, Const(VInt 5), Const(VInt 4)))])
-let () = print_newline(); print_newline(); print_newline()
-let%test _ = apply parse_all 
-{|
-function foo(x, y)
-   local c = 3
-end
+   let () = print_newline(); print_newline(); print_newline()
+   let%test _ = apply parse_all
+   {|
+   function foo(x, y)
+      local c = 3
+   end
 
-foo()
-c
-|} = None *)
+   foo()
+   c
+   |} = None *)
