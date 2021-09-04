@@ -98,12 +98,16 @@ module Eval (M : MONADERROR) = struct
   type variables = (name, value) Hashtbl_p.t
   [@@deriving show {with_path= false}]
 
+  type jump_statement = Default | Return | Break
+  [@@deriving show {with_path= false}]
+
   type enviroment =
     { vars: variables
     ; last_value: value
     ; prev_env: enviroment option
     ; is_func: bool
-    ; is_loop: bool }
+    ; is_loop: bool
+    ; jump_stmt: jump_statement }
   [@@deriving show {with_path= false}]
 
   let rec find_var varname = function
@@ -150,13 +154,13 @@ module Eval (M : MONADERROR) = struct
     | TableCreate el -> table_create env el
     | TableAccess (tname, texpr) -> table_find env tname texpr
     | CallFunc (n, el) -> (
-        set_is_func true env
-        >>= fun f_en ->
-        func_call f_en n el
+        func_call env n el
         >>= fun e ->
-        match e with
-        | Some x -> return x.last_value
-        | None -> error "Out of scope" )
+        get_env e
+        >>= fun env ->
+        match env.jump_stmt with
+        | Return -> return @@ env.last_value
+        | _ -> return VNull )
     | _ -> error "Unexpected expression"
 
   and table_append ht env key = function
@@ -213,41 +217,41 @@ module Eval (M : MONADERROR) = struct
               return
               @@ Block (Local (VarDec (create_vardec var_args fargs)) :: b)
           | _ -> error "Expected function body" in
-        block_with_vardec body >>= fun b -> eval_stmt env b
+        block_with_vardec body
+        >>= fun b ->
+        get_env env >>= fun en -> eval_stmt (Some {en with is_func= true}) b
     | _ -> error "Attempt to call not a function value"
 
   and eval_stmt env = function
     | Expression e ->
         eval_expr env e
-        >>= fun v -> set_last_value v env >>= fun en -> return @@ en
+        >>= fun v ->
+        get_env env >>= fun en -> return @@ Some {en with last_value= v}
     | VarDec el ->
         eval_vardec true env el
-        >>= fun _ -> set_last_value VNull env >>= fun en -> return en
+        >>= fun _ ->
+        get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
     | Local (VarDec el) ->
         eval_vardec false env el
-        >>= fun _ -> set_last_value VNull env >>= fun en -> return en
+        >>= fun _ ->
+        get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
     | FuncDec (n, args, b) ->
         assign n (VFunction (args, b)) true env
-        >>= fun _ -> set_last_value VNull env >>= fun en -> return en
+        >>= fun _ ->
+        get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
     | Local (FuncDec (n, args, b)) ->
         assign n (VFunction (args, b)) false env
-        >>= fun _ -> set_last_value VNull env >>= fun en -> return en
+        >>= fun _ ->
+        get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
+    (* | If if_lst -> eval_if env if_lst *)
     | Block b -> create_next_block env >>= fun e -> eval_block (Some e) b
     | Return _ -> error "Unexpected return statement"
     | Break -> error "Unexpected break statement"
     | _ -> error "Unknown statement"
 
-  and set_last_value v = function
+  and get_env = function
     | None -> error "Operation out of scope"
-    | Some env -> return @@ Some {env with last_value= v}
-
-  and set_is_func flag = function
-    | None -> error "Operation out of scope"
-    | Some env -> return @@ Some {env with is_func= flag}
-
-  and set_is_loop flag = function
-    | None -> error "Operation out of scope"
-    | Some env -> return @@ Some {env with is_loop= flag}
+    | Some env -> return env
 
   and create_next_block = function
     | None -> error "Operation out of scope"
@@ -255,7 +259,7 @@ module Eval (M : MONADERROR) = struct
         return @@ {env with prev_env= Some env; vars= Hashtbl.create 16}
 
   and eval_vardec is_global env = function
-    | [] -> set_last_value VNull env
+    | [] -> get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
     | hd :: tl -> (
       match hd with
       | Var x, e ->
@@ -276,16 +280,28 @@ module Eval (M : MONADERROR) = struct
         if is_global then return @@ set_global n v e
         else return @@ Hashtbl.replace e.vars n v
 
-  and eval_block env = function
-    | [] -> return @@ env
-    | [tl] -> (
-      match tl with
-      | Return v ->
-          eval_expr env v
-          >>= fun r -> set_last_value r env >>= fun e -> return @@ e
-      | _ -> eval_stmt env tl )
-    | hd :: tl -> eval_stmt env hd >>= fun e -> eval_block e tl
+  and eval_block env block = 
+  get_env env >>= fun env ->
+  match block with
+    | [] -> return @@ Some env
+    | [tl] ->
+      (
+      match tl with 
+      | Return v when env.is_func -> eval_return env v 
+      | Return _ -> error "Error: Return statement is out of function body"
+      | _ -> eval_stmt (Some env) tl )
+    | hd :: tl -> eval_stmt (Some env) hd >>= 
+      fun env -> get_env env >>= 
+      fun env -> 
+        match env.jump_stmt with
+          | Return -> get_env env.prev_env >>= fun pr_env -> return @@ Some {pr_env with last_value= env.last_value; jump_stmt= Return}
+          | _ -> eval_block (Some env) tl
 
+  and eval_return env e =
+    eval_expr (Some env) e >>= fun v ->
+    get_env env.prev_env >>= fun pr_env ->
+    return @@ Some {pr_env with last_value= v; jump_stmt= Return}
+   
   and eval_prog env = function
     | None -> return VNull
     | Some p -> (
@@ -305,7 +321,8 @@ let eval parsed_prog =
     ; last_value= VNull
     ; prev_env= None
     ; is_func= false
-    ; is_loop= false } in
+    ; is_loop= false
+    ; jump_stmt= Default } in
   match eval_prog (Some start_env) parsed_prog with
   | Ok res -> print_string (string_of_value res)
   | Error m -> print_endline m
