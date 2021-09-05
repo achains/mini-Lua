@@ -64,7 +64,7 @@ module Eval (M : MONADERROR) = struct
     | VFloat x, VInt y -> return @@ VFloat (Float.floor (x /. Float.of_int y))
     | _ -> error "Unsupported operands type for (//)"
 
-  (* '%' in Lua is an actual modulo, but for temporary simplicity remainder had been realised *)
+  (* '%' in Lua is an actual modulo, but for temporary simplicity remainder was realised instead *)
   let ( %% ) lhs rhs =
     match (lhs, rhs) with
     | VInt x, VInt y -> return @@ VInt (x mod y)
@@ -77,10 +77,24 @@ module Eval (M : MONADERROR) = struct
     | _ -> error "Unsupported operands type for (%)"
 
   let ( <<< ) _ _ = return (VBool true)
-  let ( <<<= ) _ _ = return (VBool true)
+
+  let ( <<<= ) lhs rhs =
+    match (lhs, rhs) with
+    | VInt x, VInt y -> return @@ VBool (x <= y)
+    | _, _ ->
+        print_string (show_value lhs ^ " " ^ show_value rhs);
+        error "not supported yet"
+
   let ( >>> ) _ _ = return (VBool true)
   let ( >>>= ) _ _ = return (VBool true)
-  let ( === ) _ _ = return (VBool true)
+
+  let ( === ) lhs rhs =
+    match (lhs, rhs) with
+    | VInt x, VInt y -> return @@ VBool (x = y)
+    | _, _ ->
+        print_string (show_value lhs ^ " " ^ show_value rhs);
+        error "not supported yet"
+
   let ( !=== ) _ _ = return (VBool true)
   let is_true = function VBool false -> false | VNull -> false | _ -> true
 
@@ -243,7 +257,7 @@ module Eval (M : MONADERROR) = struct
         assign n (VFunction (args, b)) false env
         >>= fun _ ->
         get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
-    (* | If if_lst -> eval_if env if_lst *)
+    | If if_lst -> eval_if env if_lst
     | Block b -> create_next_block env >>= fun e -> eval_block (Some e) b
     | Return _ -> error "Unexpected return statement"
     | Break -> error "Unexpected break statement"
@@ -280,28 +294,45 @@ module Eval (M : MONADERROR) = struct
         if is_global then return @@ set_global n v e
         else return @@ Hashtbl.replace e.vars n v
 
-  and eval_block env block = 
-  get_env env >>= fun env ->
-  match block with
+  and eval_if env = function
+    | [] -> return env
+    | hd :: tl -> (
+      match hd with
+      | cond, st ->
+          eval_expr env cond
+          >>= fun cond ->
+          if is_true cond then eval_stmt env st else eval_if env tl )
+
+  and eval_block env block =
+    get_env env
+    >>= fun env ->
+    match block with
     | [] -> return @@ Some env
-    | [tl] ->
-      (
-      match tl with 
-      | Return v when env.is_func -> eval_return env v 
+    | [tl] -> (
+      match tl with
+      | Return v when env.is_func -> eval_return env v
       | Return _ -> error "Error: Return statement is out of function body"
       | _ -> eval_stmt (Some env) tl )
-    | hd :: tl -> eval_stmt (Some env) hd >>= 
-      fun env -> get_env env >>= 
-      fun env -> 
+    | hd :: tl -> (
+        eval_stmt (Some env) hd
+        >>= fun env ->
+        get_env env
+        >>= fun env ->
         match env.jump_stmt with
-          | Return -> get_env env.prev_env >>= fun pr_env -> return @@ Some {pr_env with last_value= env.last_value; jump_stmt= Return}
-          | _ -> eval_block (Some env) tl
+        | Return ->
+            get_env env.prev_env
+            >>= fun pr_env ->
+            return
+            @@ Some {pr_env with last_value= env.last_value; jump_stmt= Return}
+        | _ -> eval_block (Some env) tl )
 
   and eval_return env e =
-    eval_expr (Some env) e >>= fun v ->
-    get_env env.prev_env >>= fun pr_env ->
+    eval_expr (Some env) e
+    >>= fun v ->
+    get_env env.prev_env
+    >>= fun pr_env ->
     return @@ Some {pr_env with last_value= v; jump_stmt= Return}
-   
+
   and eval_prog env = function
     | None -> return VNull
     | Some p -> (

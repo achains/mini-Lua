@@ -247,3 +247,25 @@ print(binop(a, b, prod))
    foo()
    c
    |} = None *)
+
+let () = print_newline (); print_newline ()
+
+let%test _ =
+  apply parse_all
+    {|
+function true_inc(x)
+  if x == 0 then
+    return 1
+  elseif x == 1 then 
+    return 2
+  elseif x == 2 then
+    return 3
+  else
+    return -1
+  end
+end
+
+result = true_inc(0)
+result
+|}
+  = None
