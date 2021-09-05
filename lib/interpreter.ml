@@ -29,78 +29,102 @@ module Eval (M : MONADERROR) = struct
 
   let ( ++ ) lhs rhs =
     match (lhs, rhs) with
-    | VInt x, VInt y -> return @@ VInt (x + y)
-    | VInt x, VFloat y -> return @@ VFloat (Float.of_int x +. y)
-    | VFloat x, VInt y -> return @@ VFloat (x +. Float.of_int y)
+    | VNumber x, VNumber y -> return @@ VNumber (x +. y)
+    | VNumber x, VString y -> return @@ VNumber (x +. float_of_string y)
+    | VString x, VNumber y -> return @@ VNumber (float_of_string x +. y)
     | _ -> error "Unsupported operands type for (+)"
 
   let ( -- ) lhs rhs =
     match (lhs, rhs) with
-    | VInt x, VInt y -> return @@ VInt (x - y)
-    | VInt x, VFloat y -> return @@ VFloat (Float.of_int x -. y)
-    | VFloat x, VInt y -> return @@ VFloat (x -. Float.of_int y)
+    | VNumber x, VNumber y -> return @@ VNumber (x -. y)
+    | VNumber x, VString y -> return @@ VNumber (x -. float_of_string y)
+    | VString x, VNumber y -> return @@ VNumber (float_of_string x -. y)
     | _ -> error "Unsupported operands type for (-)"
 
   let ( ** ) lhs rhs =
     match (lhs, rhs) with
-    | VInt x, VInt y -> return @@ VInt (x * y)
-    | VInt x, VFloat y -> return @@ VFloat (Float.of_int x *. y)
-    | VFloat x, VInt y -> return @@ VFloat (x *. Float.of_int y)
+    | VNumber x, VNumber y -> return @@ VNumber (x *. y)
+    | VNumber x, VString y -> return @@ VNumber (x *. float_of_string y)
+    | VString x, VNumber y -> return @@ VNumber (float_of_string x *. y)
     | _ -> error "Unsupported operands type for (*)"
 
   let ( // ) lhs rhs =
     match (lhs, rhs) with
-    | VInt x, VInt y -> return @@ VFloat (Float.of_int x /. Float.of_int y)
-    | VInt x, VFloat y -> return @@ VFloat (Float.of_int x /. y)
-    | VFloat x, VInt y -> return @@ VFloat (x /. Float.of_int y)
+    | VNumber x, VNumber y -> return @@ VNumber (x /. y)
+    | VNumber x, VString y -> return @@ VNumber (x /. float_of_string y)
+    | VString x, VNumber y -> return @@ VNumber (float_of_string x /. y)
     | _ -> error "Unsupported operands type for (/)"
 
   (* Integer division *)
-  let ( /// ) lhs rhs =
-    match (lhs, rhs) with
-    | VInt x, VInt y ->
-        return @@ VFloat (Float.floor (Float.of_int x /. Float.of_int y))
-    | VInt x, VFloat y -> return @@ VFloat (Float.floor (Float.of_int x /. y))
-    | VFloat x, VInt y -> return @@ VFloat (Float.floor (x /. Float.of_int y))
-    | _ -> error "Unsupported operands type for (//)"
+  (* let ( /// ) lhs rhs =
+       match (lhs, rhs) with
+       | VInt x, VInt y ->
+           return @@ VFloat (Float.floor (Float.of_int x /. Float.of_int y))
+       | VInt x, VFloat y -> return @@ VFloat (Float.floor (Float.of_int x /. y))
+       | VFloat x, VInt y -> return @@ VFloat (Float.floor (x /. Float.of_int y))
+       | _ -> error "Unsupported operands type for (//)"
 
-  (* '%' in Lua is an actual modulo, but for temporary simplicity remainder was realised instead *)
-  let ( %% ) lhs rhs =
-    match (lhs, rhs) with
-    | VInt x, VInt y -> return @@ VInt (x mod y)
-    | VInt x, VFloat y ->
-        let fx = Float.of_int x in
-        return @@ VFloat (fx -. (y *. Float.floor (fx /. y)))
-    | VFloat x, VInt y ->
-        let fy = Float.of_int y in
-        return @@ VFloat (fy -. (x *. Float.floor (fy /. x)))
-    | _ -> error "Unsupported operands type for (%)"
+     (* '%' in Lua is an actual modulo, but for temporary simplicity remainder was realised instead *)
+     let ( %% ) lhs rhs =
+       match (lhs, rhs) with
+       | VInt x, VInt y -> return @@ VInt (x mod y)
+       | VInt x, VFloat y ->
+           let fx = Float.of_int x in
+           return @@ VFloat (fx -. (y *. Float.floor (fx /. y)))
+       | VFloat x, VInt y ->
+           let fy = Float.of_int y in
+           return @@ VFloat (fy -. (x *. Float.floor (fy /. x)))
+       | _ -> error "Unsupported operands type for (%)" *)
 
-  let ( <<< ) _ _ = return (VBool true)
+  let ( /// ) _ _ = error "Not realised yet"
+  let ( %% ) _ _ = error "Not realised yet"
+
+  let ( <<< ) lhs rhs =
+    match (lhs, rhs) with
+    | VNumber x, VNumber y -> return @@ VBool (x < y)
+    | VNumber x, VString y -> return @@ VBool (x < float_of_string y)
+    | VString x, VNumber y -> return @@ VBool (float_of_string x < y)
+    | _ -> error "Uncomparable types"
 
   let ( <<<= ) lhs rhs =
     match (lhs, rhs) with
-    | VInt x, VInt y -> return @@ VBool (x <= y)
-    | _, _ ->
-        print_string (show_value lhs ^ " " ^ show_value rhs);
-        error "not supported yet"
+    | VNumber x, VNumber y -> return @@ VBool (x <= y)
+    | VNumber x, VString y -> return @@ VBool (x <= float_of_string y)
+    | VString x, VNumber y -> return @@ VBool (float_of_string x <= y)
+    | _ -> error "Uncomparable types"
 
-  let ( >>> ) _ _ = return (VBool true)
-  let ( >>>= ) _ _ = return (VBool true)
+  let ( >>> ) lhs rhs =
+    match (lhs, rhs) with
+    | VNumber x, VNumber y -> return @@ VBool (x > y)
+    | VNumber x, VString y -> return @@ VBool (x > float_of_string y)
+    | VString x, VNumber y -> return @@ VBool (float_of_string x > y)
+    | _ -> error "Uncomparable types"
+
+  let ( >>>= ) lhs rhs =
+    match (lhs, rhs) with
+    | VNumber x, VNumber y -> return @@ VBool (x >= y)
+    | VNumber x, VString y -> return @@ VBool (x >= float_of_string y)
+    | VString x, VNumber y -> return @@ VBool (float_of_string x >= y)
+    | _ -> error "Uncomparable types"
 
   let ( === ) lhs rhs =
     match (lhs, rhs) with
-    | VInt x, VInt y -> return @@ VBool (x = y)
-    | _, _ ->
-        print_string (show_value lhs ^ " " ^ show_value rhs);
-        error "not supported yet"
+    | VNumber x, VNumber y -> return @@ VBool (x == y)
+    | VNumber x, VString y -> return @@ VBool (x == float_of_string y)
+    | VString x, VNumber y -> return @@ VBool (float_of_string x == y)
+    | _ -> error "Uncomparable types"
 
-  let ( !=== ) _ _ = return (VBool true)
+  let ( !=== ) lhs rhs =
+    match (lhs, rhs) with
+    | VNumber x, VNumber y -> return @@ VBool (x != y)
+    | VNumber x, VString y -> return @@ VBool (x != float_of_string y)
+    | VString x, VNumber y -> return @@ VBool (float_of_string x != y)
+    | _ -> error "Uncomparable types"
+
   let is_true = function VBool false -> false | VNull -> false | _ -> true
 
   let string_of_value = function
-    | VInt v -> string_of_int v
-    | VFloat v -> string_of_float v
+    | VNumber v -> string_of_float v
     | VString v -> v
     | VBool v -> string_of_bool v
     | VTable _ -> "<table>"
@@ -208,7 +232,7 @@ module Eval (M : MONADERROR) = struct
     | VTable ht -> (
         eval_expr env texpr
         >>= function
-        | VInt key -> find_opt ht (string_of_int key)
+        | VNumber key -> find_opt ht (string_of_float key)
         | VString key -> find_opt ht key
         | _ -> error "Invalid key value" )
     | _ -> error "Attempt to index non-table value"
@@ -258,6 +282,7 @@ module Eval (M : MONADERROR) = struct
         >>= fun _ ->
         get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
     | If if_lst -> eval_if env if_lst
+    (* | ForNumerical (fvar, finit, body) -> eval_for fvar finit body env *)
     | Block b -> create_next_block env >>= fun e -> eval_block (Some e) b
     | Return _ -> error "Unexpected return statement"
     | Break -> error "Unexpected break statement"
@@ -332,6 +357,17 @@ module Eval (M : MONADERROR) = struct
     get_env env.prev_env
     >>= fun pr_env ->
     return @@ Some {pr_env with last_value= v; jump_stmt= Return}
+
+  (* and eval_for fvar finit body env =
+     let check_init = function
+       | [start; stop; step] -> match start with
+     let cond_to_values = function
+       | [start; stop; step] -> eval_expr env start >>= fun start -> eval_expr env stop >>= fun stop -> eval_expr env step >>= fun step ->
+         return @@ [start; stop; step]
+       | [start; stop] -> eval_expr env start >>= fun start -> eval_expr env stop >>= fun stop ->
+         return @@ [start; stop; VInt 1]
+       | _ -> error "Bad 'for' constructor"
+     match *)
 
   and eval_prog env = function
     | None -> return VNull

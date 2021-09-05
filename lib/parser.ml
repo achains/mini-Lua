@@ -26,8 +26,8 @@ module PExpression = struct
     >>= function s when List.mem s reserved -> mzero | s -> return s
 
   (* Atomic expressions *)
-  let const_int = int_parser >>= fun n -> return (Const (VInt n))
-  let const_float = float_parser >>= fun n -> return (Const (VFloat n))
+  let const_int = int_parser >>= fun n -> return (Const (VNumber (float_of_int n)))
+  let const_float = float_parser >>= fun n -> return (Const (VNumber n))
   let const_number = const_float <|> const_int
 
   let const_bool =
@@ -83,7 +83,7 @@ module PExpression = struct
 
   and unary_expr input =
     ( token "-" >> lexeme primary
-    >>= (fun x -> return (ArOp (Sub, Const (VInt 0), x)))
+    >>= (fun x -> return (ArOp (Sub, Const (VNumber 0.), x)))
     <|> (token "not" >> lexeme primary >>= fun x -> return (UnOp (Not, x)))
     <|> primary )
       input

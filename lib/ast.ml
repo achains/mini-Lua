@@ -13,8 +13,7 @@ type name = string [@@deriving show {with_path= false}]
 
 type value =
   | VBool of bool
-  | VInt of int
-  | VFloat of float
+  | VNumber of float
   | VString of string
   | VTable of (name, value) Hashtbl_p.t
   | VFunction of name list * statement
