@@ -17,7 +17,6 @@ function sub(x, y)
 end
 
 c = binop(sub(10, 5), 7, add)
-c
 |}
 
 let () =

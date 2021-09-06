@@ -267,11 +267,11 @@ module Eval (M : MONADERROR) = struct
         get_env env >>= fun en -> return @@ Some {en with last_value= v}
     | VarDec el ->
         eval_vardec true env el
-        >>= fun _ ->
+        >>= fun env ->
         get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
     | Local (VarDec el) ->
         eval_vardec false env el
-        >>= fun _ ->
+        >>= fun env ->
         get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
     | FuncDec (n, args, b) ->
         assign n (VFunction (args, b)) true env
@@ -293,7 +293,14 @@ module Eval (M : MONADERROR) = struct
     | Some env -> return env
 
   and create_next_block = function
-    | None -> error "Operation out of scope"
+    | None ->
+        return
+        @@ { vars= Hashtbl.create 16
+           ; last_value= VNull
+           ; prev_env= None
+           ; is_func= false
+           ; is_loop= false
+           ; jump_stmt= Default }
     | Some env ->
         return @@ {env with prev_env= Some env; vars= Hashtbl.create 16}
 
@@ -304,20 +311,22 @@ module Eval (M : MONADERROR) = struct
       | Var x, e ->
           eval_expr env e
           >>= fun v ->
-          assign x v is_global env >>= fun _ -> eval_vardec is_global env tl
+          assign x v is_global env >>= fun en -> eval_vardec is_global en tl
       | _ -> error "Wrong type to assign to" )
 
   and assign n v is_global env =
     let rec set_global n v env =
       match env.prev_env with
       | None -> Hashtbl.replace env.vars n v
-      | Some pe -> set_global n v pe in
+      | Some pe -> (
+        match Hashtbl.find_opt env.vars n with
+        | None -> set_global n v pe
+        | Some _ -> Hashtbl.replace env.vars n v ) in
     match env with
     | None -> error "Operation out of scope"
     | Some e ->
-        (*print_string(show_enviroment e);*)
-        if is_global then return @@ set_global n v e
-        else return @@ Hashtbl.replace e.vars n v
+        if is_global then (set_global n v e; return env)
+        else (Hashtbl.replace e.vars n v; return env)
 
   and eval_if env = function
     | [] -> return env
@@ -332,12 +341,23 @@ module Eval (M : MONADERROR) = struct
     get_env env
     >>= fun env ->
     match block with
-    | [] -> return @@ Some env
+    | [] -> return @@ env.prev_env
     | [tl] -> (
       match tl with
       | Return v when env.is_func -> eval_return env v
       | Return _ -> error "Error: Return statement is out of function body"
-      | _ -> eval_stmt (Some env) tl )
+      | _ -> (
+          eval_stmt (Some env) tl
+          >>= fun env ->
+          get_env env
+          >>= fun env ->
+          match env.jump_stmt with
+          | Return ->
+              get_env env.prev_env
+              >>= fun pr_env ->
+              return
+              @@ Some {pr_env with last_value= env.last_value; jump_stmt= Return}
+          | _ -> print_last_env env; return @@ env.prev_env ) )
     | hd :: tl -> (
         eval_stmt (Some env) hd
         >>= fun env ->
@@ -351,6 +371,12 @@ module Eval (M : MONADERROR) = struct
             @@ Some {pr_env with last_value= env.last_value; jump_stmt= Return}
         | _ -> eval_block (Some env) tl )
 
+  (* === Temporary solution for printing result in demos === *)
+  and print_last_env env =
+    match env.prev_env with
+    | None -> print_string (show_enviroment env)
+    | Some _ -> ()
+
   and eval_return env e =
     eval_expr (Some env) e
     >>= fun v ->
@@ -359,20 +385,38 @@ module Eval (M : MONADERROR) = struct
     return @@ Some {pr_env with last_value= v; jump_stmt= Return}
 
   (* and eval_for fvar finit body env =
-     let check_init = function
-       | [start; stop; step] -> match start with
-     let cond_to_values = function
-       | [start; stop; step] -> eval_expr env start >>= fun start -> eval_expr env stop >>= fun stop -> eval_expr env step >>= fun step ->
-         return @@ [start; stop; step]
-       | [start; stop] -> eval_expr env start >>= fun start -> eval_expr env stop >>= fun stop ->
-         return @@ [start; stop; VInt 1]
-       | _ -> error "Bad 'for' constructor"
-     match *)
+       let check_expr_number env num =
+         eval_expr env num >>= function
+           | VNumber v -> return v
+           | _ -> error "bad 'for' initial value (number expected)"
+       in
+       let cond_to_floats = function
+         | [start; stop; step] ->
+             check_expr_number env start
+             >>= fun start ->
+             check_expr_number env stop
+             >>= fun stop ->
+             check_expr_number env step
+             >>= fun step -> return [start; stop; step]
+         | [start; stop] ->
+             check_expr_number env start
+             >>= fun start ->
+             check_expr_number env stop
+             >>= fun stop -> return [start; stop; 1.]
+         | _ -> error "Bad 'for' constructor" in
+       (* let zip_body = VarDec *)
+       cond_to_floats finit >>= fun for_init -> for_numerical for_init env
+     and for_numerical for_init env body =
+       let rec helper acc stop step =
+         if (acc > stop) then
+           return @@ env
+         else
+           e *)
 
-  and eval_prog env = function
+  and eval_prog = function
     | None -> return VNull
     | Some p -> (
-        eval_stmt env p
+        eval_stmt None p
         >>= fun en ->
         match en with
         | None -> return @@ VNull
@@ -383,13 +427,6 @@ end
 open Eval (Result)
 
 let eval parsed_prog =
-  let start_env =
-    { vars= Hashtbl.create 16
-    ; last_value= VNull
-    ; prev_env= None
-    ; is_func= false
-    ; is_loop= false
-    ; jump_stmt= Default } in
-  match eval_prog (Some start_env) parsed_prog with
+  match eval_prog parsed_prog with
   | Ok res -> print_string (string_of_value res)
   | Error m -> print_endline m

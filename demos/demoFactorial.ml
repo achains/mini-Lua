@@ -4,15 +4,14 @@ open Lua_lib.Interpreter
 let parse_result =
   apply PStatement.parse_all
     {|
-function factorial(n)
+function fac(n)
   if n <= 1 then
     return 1
   end
-  return factorial(n - 1) * n
+  return fac(n - 1) * n
 end
 
-result = factorial(5)
-result
+c = fac(5)
 |}
 
 let () =
