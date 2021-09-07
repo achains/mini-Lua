@@ -38,3 +38,17 @@
  (libraries Lua.Lib)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoBreak)
+ (modules demoBreak)
+ (libraries Lua.Lib)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoEratosthenes)
+ (modules demoEratosthenes)
+ (libraries Lua.Lib)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

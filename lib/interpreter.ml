@@ -62,22 +62,17 @@ module Eval (M : MONADERROR) = struct
            return @@ VFloat (Float.floor (Float.of_int x /. Float.of_int y))
        | VInt x, VFloat y -> return @@ VFloat (Float.floor (Float.of_int x /. y))
        | VFloat x, VInt y -> return @@ VFloat (Float.floor (x /. Float.of_int y))
-       | _ -> error "Unsupported operands type for (//)"
+       | _ -> error "Unsupported operands type for (//)" *)
 
-     (* '%' in Lua is an actual modulo, but for temporary simplicity remainder was realised instead *)
-     let ( %% ) lhs rhs =
-       match (lhs, rhs) with
-       | VInt x, VInt y -> return @@ VInt (x mod y)
-       | VInt x, VFloat y ->
-           let fx = Float.of_int x in
-           return @@ VFloat (fx -. (y *. Float.floor (fx /. y)))
-       | VFloat x, VInt y ->
-           let fy = Float.of_int y in
-           return @@ VFloat (fy -. (x *. Float.floor (fy /. x)))
-       | _ -> error "Unsupported operands type for (%)" *)
+  (* '%' in Lua is an actual modulo, but for temporary simplicity remainder was realised instead *)
+  let ( %% ) lhs rhs =
+    match (lhs, rhs) with
+    | VNumber x, VNumber _ ->
+        return @@ VNumber (float_of_int @@ (int_of_float x mod 2))
+    | _, _ -> error "error"
 
   let ( /// ) _ _ = error "Not realised yet"
-  let ( %% ) _ _ = error "Not realised yet"
+  (* let ( %% ) _ _ = error "Not realised yet" *)
 
   let ( <<< ) lhs rhs =
     match (lhs, rhs) with
@@ -219,7 +214,7 @@ module Eval (M : MONADERROR) = struct
           table_append ht env (key + 1) tl )
 
   and table_create env elist =
-    let ht = Hashtbl.create 16 in
+    let ht = Hashtbl.create 256 in
     table_append ht env 1 elist
 
   and table_find env tname texpr =
@@ -285,7 +280,7 @@ module Eval (M : MONADERROR) = struct
     | ForNumerical (fvar, finit, body) ->
         get_env env
         >>= fun env -> eval_for fvar finit body (Some {env with is_loop= true})
-    | Block b -> create_next_block env >>= fun e -> eval_block (Some e) b
+    | Block b -> create_next_env env >>= fun e -> eval_block (Some e) b
     | Return _ -> error "Unexpected return statement"
     | Break -> error "Unexpected break statement"
     | _ -> error "Unknown statement"
@@ -294,7 +289,7 @@ module Eval (M : MONADERROR) = struct
     | None -> error "Operation out of scope"
     | Some env -> return env
 
-  and create_next_block = function
+  and create_next_env = function
     | None ->
         return
         @@ { vars= Hashtbl.create 16
@@ -314,6 +309,17 @@ module Eval (M : MONADERROR) = struct
           eval_expr env e
           >>= fun v ->
           assign x v is_global env >>= fun en -> eval_vardec is_global en tl
+      | TableAccess (tname, index), e -> (
+          eval_expr env e
+          >>= fun val_to_assign ->
+          eval_expr env index
+          >>= fun key ->
+          find_var tname env
+          >>= function
+          | VTable t ->
+              Hashtbl.replace t (string_of_value key) val_to_assign;
+              eval_vardec is_global env tl
+          | _ -> error "Attempt to index non-table value" )
       | _ -> error "Wrong type to assign to" )
 
   and assign n v is_global env =
@@ -422,12 +428,17 @@ module Eval (M : MONADERROR) = struct
           @@ Block (create_local_vardec (Var fvar) (Const (VNumber start)) :: b)
       | _ -> error "Expected for body" in
     let rec helper start stop step body env =
-      declare_init fvar start body
-      >>= fun body_with_init ->
-      eval_stmt env body_with_init
-      >>= fun env ->
-      if start +. step > stop then return env
-      else helper (start +. step) stop step body env in
+      if start > stop then return env
+      else
+        declare_init fvar start body
+        >>= fun body_with_init ->
+        eval_stmt env body_with_init
+        >>= fun env ->
+        get_env env
+        >>= fun env ->
+        match env.jump_stmt with
+        | Break -> return @@ Some {env with jump_stmt= Default}
+        | _ -> helper (start +. step) stop step body (Some env) in
     match finit with
     | [start; stop; step] -> helper start stop step body env
     | _ -> error "Bad 'for' constructor"

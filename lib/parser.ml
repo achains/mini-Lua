@@ -100,7 +100,7 @@ module PExpression = struct
 
   and create_table input =
     ( token "{"
-    >> sep_by1 expr (token ",")
+    >> sep_by expr (token ",")
     >>= fun table_elems -> token "}" >> return (TableCreate table_elems) )
       input
 
