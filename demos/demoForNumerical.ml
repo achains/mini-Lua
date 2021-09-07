@@ -2,7 +2,7 @@ open Lua_lib.Parser
 open Lua_lib.Interpreter
 
 let parse_result =
-  apply PStatement.parse_all
+  PStatement.parse_prog
     {|
 s = 0
 for i = 1, 10 do
@@ -12,7 +12,4 @@ for i = 1, 10 do
 end
 |}
 
-let () =
-  match parse_result with
-  | None -> print_string "error"
-  | Some _ -> eval parse_result
+let () = eval parse_result

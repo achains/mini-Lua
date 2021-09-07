@@ -140,7 +140,8 @@ module Eval (M : MONADERROR) = struct
     ; prev_env: enviroment option
     ; is_func: bool
     ; is_loop: bool
-    ; jump_stmt: jump_statement }
+    ; jump_stmt: jump_statement
+    ; last_env: enviroment option }
   [@@deriving show {with_path= false}]
 
   let rec find_var varname = function
@@ -297,7 +298,8 @@ module Eval (M : MONADERROR) = struct
            ; prev_env= None
            ; is_func= false
            ; is_loop= false
-           ; jump_stmt= Default }
+           ; jump_stmt= Default
+           ; last_env= None }
     | Some env ->
         return @@ {env with prev_env= Some env; vars= Hashtbl.create 16}
 
@@ -368,7 +370,10 @@ module Eval (M : MONADERROR) = struct
               return
               @@ Some {pr_env with last_value= env.last_value; jump_stmt= Return}
           | Break -> eval_break env
-          | _ -> print_last_env env; return @@ env.prev_env ) )
+          | _ -> (
+            match env.prev_env with
+            | None -> return @@ Some env
+            | Some pr_env -> return @@ Some pr_env ) ) )
     | hd :: tl -> (
         eval_stmt (Some env) hd
         >>= fun env ->
@@ -383,8 +388,8 @@ module Eval (M : MONADERROR) = struct
         | Break -> eval_break env
         | _ -> eval_block (Some env) tl )
 
-  (* === Temporary solution for printing result in demos === *)
-  and print_last_env env =
+  (* === This function sets last enviroment to show as a result of interpreter === *)
+  and set_last_env env =
     match env.prev_env with
     | None -> print_string (show_enviroment env)
     | Some _ -> ()
@@ -444,19 +449,16 @@ module Eval (M : MONADERROR) = struct
     | _ -> error "Bad 'for' constructor"
 
   and eval_prog = function
-    | None -> return VNull
+    | None -> error "Syntax error occured"
     | Some p -> (
         eval_stmt None p
-        >>= fun en ->
-        match en with
-        | None -> return @@ VNull
-        | Some e -> (*print_string(show_enviroment e);*) return @@ e.last_value
-        )
+        >>= function
+        | None -> error "Result enviroment is empty" | Some e -> return @@ e )
 end
 
 open Eval (Result)
 
 let eval parsed_prog =
   match eval_prog parsed_prog with
-  | Ok res -> print_string (string_of_value res)
+  | Ok res -> print_endline @@ show_enviroment res
   | Error m -> print_endline m

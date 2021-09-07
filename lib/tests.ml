@@ -3,7 +3,7 @@ open Parser
 open Parser.PExpression
 open Parser.PStatement
 
-(* Expression tests *)
+(* ==== Expression tests ==== *)
 
 let%test _ = apply ident "_Test_1_" = Some "_Test_1_"
 let%test _ = apply ident "if" = None
@@ -41,7 +41,7 @@ let%test _ =
       (CallFunc
          ("foo", [Assign (Var "a", Const (VNumber 3.)); Const (VNumber 5.)]) )
 
-(* Statement tests *)
+(* ==== Statement tests ==== *)
 
 let%test _ = apply return_stmt "return a" = Some (Return (Var "a"))
 let%test _ = apply return_stmt "return" = Some (Return (Const VNull))
@@ -114,11 +114,10 @@ let%test _ =
   = Some
       (FuncDec ("a", ["x"; "y"], Block [Return (ArOp (Sum, Var "x", Var "y"))]))
 
-(* Parse all *)
+(* === Parse Lua Program tests === *)
 
-(* factorial.lua *)
 let%test _ =
-  apply parse_all
+  parse_prog
     "\n\
      function fact (n)\n\
     \    if n == 0 then\n\
@@ -177,11 +176,8 @@ let%test _ =
                            , CallFunc ("fact", [TableAccess ("data", Var "i")])
                            ) ) ] ] ) ] )
 
-(* use_local.lua *)
-let () = print_newline (); print_newline ()
-
 let%test _ =
-  apply parse_all
+  parse_prog
     {|  
 x = 10
 
@@ -207,7 +203,7 @@ print(x)
          ; Expression (CallFunc ("print", [Var "x"])) ] )
 
 let%test _ =
-  apply parse_all
+  parse_prog
     {|
 function binop(x, y, op)
   local result = op(x, y)
@@ -241,17 +237,3 @@ print(binop(a, b, prod))
              (CallFunc
                 ("print", [CallFunc ("binop", [Var "a"; Var "b"; Var "prod"])])
              ) ] )
-
-(* let%test _ = apply parse_all "5 + 4" = Some (Block [Expression(ArOp(Sum, Const(VNumber 5), Const(VNumber 4)))])
-   let () = print_newline(); print_newline(); print_newline()
-   let%test _ = apply parse_all
-   {|
-   function foo(x, y)
-      local c = 3
-   end
-
-   foo()
-   c
-   |} = None *)
-
-let () = print_newline (); print_newline ()

@@ -2,7 +2,7 @@ open Lua_lib.Parser
 open Lua_lib.Interpreter
 
 let parse_result =
-  apply PStatement.parse_all
+  PStatement.parse_prog
     {|
  x = 5 
  if true then
@@ -11,7 +11,4 @@ let parse_result =
  end
   |}
 
-let () =
-  match parse_result with
-  | None -> print_string "error"
-  | Some _ -> eval parse_result
+let () = eval parse_result

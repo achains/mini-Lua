@@ -232,10 +232,13 @@ module PStatement = struct
       input
 
   (* Lua-program parser *)
-  let parse_all input =
-    ( sep_by stmt spaces
-    >>= fun result ->
-    (* print_string (show_statement (Block result)); *)
-    return (Block result) )
-      input
+
+  let prog = sep_by stmt spaces << (spaces << eof ())
+
+  let parse_prog input =
+    match apply prog input with
+    | Some res ->
+        (* print_string("\n===\n" ^ show_statement(Block res) ^ "\n===\n"); *)
+        Some (Block res)
+    | None -> None
 end
