@@ -109,16 +109,16 @@ module Eval (M : MONADERROR) = struct
 
   let ( === ) lhs rhs =
     match (lhs, rhs) with
-    | VNumber x, VNumber y -> return @@ VBool (x == y)
-    | VNumber x, VString y -> return @@ VBool (x == float_of_string y)
-    | VString x, VNumber y -> return @@ VBool (float_of_string x == y)
+    | VNumber x, VNumber y -> return @@ VBool (x = y)
+    | VNumber x, VString y -> return @@ VBool (x = float_of_string y)
+    | VString x, VNumber y -> return @@ VBool (float_of_string x = y)
     | _ -> error "Uncomparable types"
 
   let ( !=== ) lhs rhs =
     match (lhs, rhs) with
-    | VNumber x, VNumber y -> return @@ VBool (x != y)
-    | VNumber x, VString y -> return @@ VBool (x != float_of_string y)
-    | VString x, VNumber y -> return @@ VBool (float_of_string x != y)
+    | VNumber x, VNumber y -> return @@ VBool (x <> y)
+    | VNumber x, VString y -> return @@ VBool (x <> float_of_string y)
+    | VString x, VNumber y -> return @@ VBool (float_of_string x <> y)
     | _ -> error "Uncomparable types"
 
   let is_true = function VBool false -> false | VNull -> false | _ -> true
@@ -282,7 +282,9 @@ module Eval (M : MONADERROR) = struct
         >>= fun _ ->
         get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
     | If if_lst -> eval_if env if_lst
-    (* | ForNumerical (fvar, finit, body) -> eval_for fvar finit body env *)
+    | ForNumerical (fvar, finit, body) ->
+        get_env env
+        >>= fun env -> eval_for fvar finit body (Some {env with is_loop= true})
     | Block b -> create_next_block env >>= fun e -> eval_block (Some e) b
     | Return _ -> error "Unexpected return statement"
     | Break -> error "Unexpected break statement"
@@ -345,6 +347,8 @@ module Eval (M : MONADERROR) = struct
     | [tl] -> (
       match tl with
       | Return v when env.is_func -> eval_return env v
+      | Break when env.is_loop -> eval_break env
+      | Break -> error "Error: Break statement is out of loop body"
       | Return _ -> error "Error: Return statement is out of function body"
       | _ -> (
           eval_stmt (Some env) tl
@@ -357,6 +361,7 @@ module Eval (M : MONADERROR) = struct
               >>= fun pr_env ->
               return
               @@ Some {pr_env with last_value= env.last_value; jump_stmt= Return}
+          | Break -> eval_break env
           | _ -> print_last_env env; return @@ env.prev_env ) )
     | hd :: tl -> (
         eval_stmt (Some env) hd
@@ -369,6 +374,7 @@ module Eval (M : MONADERROR) = struct
             >>= fun pr_env ->
             return
             @@ Some {pr_env with last_value= env.last_value; jump_stmt= Return}
+        | Break -> eval_break env
         | _ -> eval_block (Some env) tl )
 
   (* === Temporary solution for printing result in demos === *)
@@ -384,34 +390,47 @@ module Eval (M : MONADERROR) = struct
     >>= fun pr_env ->
     return @@ Some {pr_env with last_value= v; jump_stmt= Return}
 
-  (* and eval_for fvar finit body env =
-       let check_expr_number env num =
-         eval_expr env num >>= function
-           | VNumber v -> return v
-           | _ -> error "bad 'for' initial value (number expected)"
-       in
-       let cond_to_floats = function
-         | [start; stop; step] ->
-             check_expr_number env start
-             >>= fun start ->
-             check_expr_number env stop
-             >>= fun stop ->
-             check_expr_number env step
-             >>= fun step -> return [start; stop; step]
-         | [start; stop] ->
-             check_expr_number env start
-             >>= fun start ->
-             check_expr_number env stop
-             >>= fun stop -> return [start; stop; 1.]
-         | _ -> error "Bad 'for' constructor" in
-       (* let zip_body = VarDec *)
-       cond_to_floats finit >>= fun for_init -> for_numerical for_init env
-     and for_numerical for_init env body =
-       let rec helper acc stop step =
-         if (acc > stop) then
-           return @@ env
-         else
-           e *)
+  and eval_break env =
+    get_env env.prev_env
+    >>= fun pr_env -> return @@ Some {pr_env with jump_stmt= Break}
+
+  and eval_for fvar finit body env =
+    let check_expr_number env num =
+      eval_expr env num
+      >>= function
+      | VNumber v -> return v
+      | _ -> error "bad 'for' initial value (number expected)" in
+    let cond_to_floats = function
+      | [start; stop; step] ->
+          check_expr_number env start
+          >>= fun start ->
+          check_expr_number env stop
+          >>= fun stop ->
+          check_expr_number env step >>= fun step -> return [start; stop; step]
+      | [start; stop] ->
+          check_expr_number env start
+          >>= fun start ->
+          check_expr_number env stop >>= fun stop -> return [start; stop; 1.]
+      | _ -> error "Bad 'for' constructor" in
+    cond_to_floats finit >>= fun finit -> for_numerical fvar finit body env
+
+  and for_numerical fvar finit body env =
+    let create_local_vardec var value = Local (VarDec [(var, value)]) in
+    let declare_init fvar start = function
+      | Block b ->
+          return
+          @@ Block (create_local_vardec (Var fvar) (Const (VNumber start)) :: b)
+      | _ -> error "Expected for body" in
+    let rec helper start stop step body env =
+      declare_init fvar start body
+      >>= fun body_with_init ->
+      eval_stmt env body_with_init
+      >>= fun env ->
+      if start +. step > stop then return env
+      else helper (start +. step) stop step body env in
+    match finit with
+    | [start; stop; step] -> helper start stop step body env
+    | _ -> error "Bad 'for' constructor"
 
   and eval_prog = function
     | None -> return VNull

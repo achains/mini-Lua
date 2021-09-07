@@ -26,7 +26,9 @@ module PExpression = struct
     >>= function s when List.mem s reserved -> mzero | s -> return s
 
   (* Atomic expressions *)
-  let const_int = int_parser >>= fun n -> return (Const (VNumber (float_of_int n)))
+  let const_int =
+    int_parser >>= fun n -> return (Const (VNumber (float_of_int n)))
+
   let const_float = float_parser >>= fun n -> return (Const (VNumber n))
   let const_number = const_float <|> const_int
 
@@ -44,7 +46,7 @@ module PExpression = struct
       List.iter (Buffer.add_char buf) chars;
       Buffer.contents buf in
     token "\""
-    >> many (satisfy (fun c -> c != '\"'))
+    >> many (satisfy (fun c -> c <> '\"'))
     >>= fun list -> token "\"" >> return (Const (VString (string_of_chars list)))
 
   (* Arithmetic operators *)
@@ -190,8 +192,7 @@ module PStatement = struct
     >>= function
     | conds when List.length conds < 2 || List.length conds > 3 -> mzero
     | conds ->
-        block_stmt >>= fun body -> return (ForNumerical (Var var, conds, body))
-    )
+        block_stmt >>= fun body -> return (ForNumerical (var, conds, body)) )
       input
 
   (* TODO: Think how to avoid list @ concat *)

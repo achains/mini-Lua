@@ -16,7 +16,7 @@ let parse_result =
     end
   end
   
-  result = true_inc(6)
+  result = true_inc(1)
   |}
 
 let () =

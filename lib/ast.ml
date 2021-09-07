@@ -36,7 +36,7 @@ and expr =
 and statement =
   | If of (expr * statement) list
   | While of expr * statement
-  | ForNumerical of expr * expr list * statement (* for a(expr) = 1, 5, 2 (expr list) do <(statement)> end *)
+  | ForNumerical of name * expr list * statement (* for a(expr) = 1, 5, 2 (expr list) do <(statement)> end *)
   | Break
   | Local of statement
   | Return of expr

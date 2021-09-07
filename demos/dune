@@ -24,3 +24,17 @@
  (libraries Lua.Lib)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoLocal)
+ (modules demoLocal)
+ (libraries Lua.Lib)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoForNumerical)
+ (modules demoForNumerical)
+ (libraries Lua.Lib)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

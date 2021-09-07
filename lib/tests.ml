@@ -26,7 +26,9 @@ let%test _ =
 let%test _ =
   apply table_access "data[3]" = Some (TableAccess ("data", Const (VNumber 3.)))
 
-let%test _ = apply expr "-5" = Some (ArOp (Sub, Const (VNumber 0.), Const (VNumber 5.)))
+let%test _ =
+  apply expr "-5" = Some (ArOp (Sub, Const (VNumber 0.), Const (VNumber 5.)))
+
 let%test _ = apply expr "a = 5" = Some (Assign (Var "a", Const (VNumber 5.)))
 
 let%test _ =
@@ -35,7 +37,9 @@ let%test _ =
 
 let%test _ =
   apply call_func "foo   (a=3, 5)"
-  = Some (CallFunc ("foo", [Assign (Var "a", Const (VNumber 3.)); Const (VNumber 5.)]))
+  = Some
+      (CallFunc
+         ("foo", [Assign (Var "a", Const (VNumber 3.)); Const (VNumber 5.)]) )
 
 (* Statement tests *)
 
@@ -59,7 +63,8 @@ let%test _ =
   = Some (Block [VarDec [(Var "a", Const (VNumber 1.))]])
 
 let%test _ =
-  apply expr_stmt "a = 3" = Some (Expression (Assign (Var "a", Const (VNumber 3.))))
+  apply expr_stmt "a = 3"
+  = Some (Expression (Assign (Var "a", Const (VNumber 3.))))
 
 let%test _ =
   apply while_stmt "while a == true do a = false end"
@@ -72,9 +77,11 @@ let%test _ =
   apply for_num_stmt "for i = 1,5,2 do 1 2 end"
   = Some
       (ForNumerical
-         ( Var "i"
+         ( "i"
          , [Const (VNumber 1.); Const (VNumber 5.); Const (VNumber 2.)]
-         , Block [Expression (Const (VNumber 1.)); Expression (Const (VNumber 2.))] ) )
+         , Block
+             [Expression (Const (VNumber 1.)); Expression (Const (VNumber 2.))]
+         ) )
 
 let%test _ = apply for_num_stmt "for i = 1 do 1 end" = None
 
@@ -143,14 +150,15 @@ let%test _ =
                                   , Var "n"
                                   , CallFunc
                                       ( "fact"
-                                      , [ArOp (Sub, Var "n", Const (VNumber 1.))] )
-                                  ) ) ] ) ] ] )
+                                      , [ArOp (Sub, Var "n", Const (VNumber 1.))]
+                                      ) ) ) ] ) ] ] )
          ; VarDec
              [ ( Var "data"
                , TableCreate
                    [ Const (VNumber 1.); Const (VNumber 2.); Const (VNumber 3.)
                    ; Const (VNumber 4.); Const (VNumber 5.); Const (VNumber 6.)
-                   ; Const (VNumber 7.) ] ) ]; VarDec [(Var "s", Const (VNumber 0.))]
+                   ; Const (VNumber 7.) ] ) ]
+         ; VarDec [(Var "s", Const (VNumber 0.))]
          ; VarDec
              [ ( Var "s"
                , ArOp
@@ -158,7 +166,7 @@ let%test _ =
                    , Var "s"
                    , CallFunc ("fact", [TableAccess ("data", Var "i")]) ) ) ]
          ; ForNumerical
-             ( Var "i"
+             ( "i"
              , [Const (VNumber 1.); Const (VNumber 7.)]
              , Block
                  [ VarDec
@@ -227,7 +235,8 @@ print(binop(a, b, prod))
                  ; Return (Var "result") ] )
          ; FuncDec
              ("prod", ["x"; "y"], Block [Return (ArOp (Mul, Var "x", Var "y"))])
-         ; VarDec [(Var "a", Const (VNumber 5.))]; VarDec [(Var "b", Const (VNumber 4.))]
+         ; VarDec [(Var "a", Const (VNumber 5.))]
+         ; VarDec [(Var "b", Const (VNumber 4.))]
          ; Expression
              (CallFunc
                 ("print", [CallFunc ("binop", [Var "a"; Var "b"; Var "prod"])])
