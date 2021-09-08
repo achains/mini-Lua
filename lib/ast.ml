@@ -16,7 +16,7 @@ type value =
   | VNumber of float
   | VString of string
   | VTable of (name, value) Hashtbl_p.t
-  | VFunction of name list * statement
+  | VFunction of name list * statement (* name list -- function arguments, statement -- function body*)
   | VNull
 [@@deriving show {with_path= false}]
 
@@ -27,9 +27,9 @@ and expr =
   | LogOp of logop * expr * expr
   | UnOp of unop * expr
   | RelOp of relop * expr * expr
-  | TableAccess of name * expr
-  | TableCreate of expr list
-  | CallFunc of name * expr list
+  | TableAccess of name * expr (* name[expr], where 'name' is name of the table *)
+  | TableCreate of expr list (* Lua supports table constructor like {1, 2, a = 4}*)
+  | CallFunc of name * expr list (* name([expr list]), where 'name' is name of the function and 'expr list' is passed arguments*)
   | Assign of expr * expr
 [@@deriving show {with_path= false}]
 
@@ -43,6 +43,5 @@ and statement =
   | VarDec of (expr * expr) list
   | Expression of expr
   | Block of statement list
-  | FuncDec of name * name list * statement
-(* func_name * args * block *)
+  | FuncDec of name * name list * statement (* name -- name of function, name list -- function arguments, statement -- function body*)
 [@@deriving show {with_path= false}]

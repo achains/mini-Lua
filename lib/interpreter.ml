@@ -56,23 +56,29 @@ module Eval (M : MONADERROR) = struct
     | _ -> error "Unsupported operands type for (/)"
 
   (* Integer division *)
-  (* let ( /// ) lhs rhs =
-       match (lhs, rhs) with
-       | VInt x, VInt y ->
-           return @@ VFloat (Float.floor (Float.of_int x /. Float.of_int y))
-       | VInt x, VFloat y -> return @@ VFloat (Float.floor (Float.of_int x /. y))
-       | VFloat x, VInt y -> return @@ VFloat (Float.floor (x /. Float.of_int y))
-       | _ -> error "Unsupported operands type for (//)" *)
-
-  (* '%' in Lua is an actual modulo, but for temporary simplicity remainder was realised instead *)
-  let ( %% ) lhs rhs =
+  let ( /// ) lhs rhs =
     match (lhs, rhs) with
-    | VNumber x, VNumber _ ->
-        return @@ VNumber (float_of_int @@ (int_of_float x mod 2))
-    | _, _ -> error "error"
+    | VNumber x, VNumber y -> return @@ VNumber (Float.floor (x /. y))
+    | VNumber x, VString y ->
+        return @@ VNumber (Float.floor (x /. float_of_string y))
+    | VString x, VNumber y ->
+        return @@ VNumber (Float.floor (float_of_string x /. y))
+    | _ -> error "Unsupported operands type for (//)"
 
-  let ( /// ) _ _ = error "Not realised yet"
-  (* let ( %% ) _ _ = error "Not realised yet" *)
+  (* Remainder *)
+  let ( %% ) lhs rhs =
+    lhs /// rhs
+    >>= function
+    | VNumber int_part -> (
+      match (lhs, rhs) with
+      | VNumber x, VNumber y -> return @@ VNumber (x -. (int_part *. y))
+      | VNumber x, VString y ->
+          return @@ VNumber (x -. (int_part *. float_of_string y))
+      | VString x, VNumber y ->
+          return @@ VNumber (float_of_string x -. (int_part *. y))
+      | _, _ -> error "Unsupported opearnds type for (%)" )
+    | _ -> error "Unsupported opearnds type for (%)"
+
 
   let ( <<< ) lhs rhs =
     match (lhs, rhs) with
@@ -141,7 +147,7 @@ module Eval (M : MONADERROR) = struct
     ; is_func: bool
     ; is_loop: bool
     ; jump_stmt: jump_statement
-    ; last_env: enviroment option }
+    ; last_env: enviroment option }  (* last_env is needed in case we want to show variables scope after interpretation *)
   [@@deriving show {with_path= false}]
 
   let rec find_var varname = function
@@ -457,6 +463,8 @@ module Eval (M : MONADERROR) = struct
 end
 
 open Eval (Result)
+
+(* Function to run interpreter *)
 
 let eval parsed_prog =
   match eval_prog parsed_prog with
