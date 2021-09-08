@@ -59,3 +59,10 @@
  (libraries Lua.Lib)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoWhile)
+ (modules demoWhile)
+ (libraries Lua.Lib)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

@@ -79,7 +79,6 @@ module Eval (M : MONADERROR) = struct
       | _, _ -> error "Unsupported opearnds type for (%)" )
     | _ -> error "Unsupported opearnds type for (%)"
 
-
   let ( <<< ) lhs rhs =
     match (lhs, rhs) with
     | VNumber x, VNumber y -> return @@ VBool (x < y)
@@ -147,7 +146,8 @@ module Eval (M : MONADERROR) = struct
     ; is_func: bool
     ; is_loop: bool
     ; jump_stmt: jump_statement
-    ; last_env: enviroment option }  (* last_env is needed in case we want to show variables scope after interpretation *)
+    ; last_env: enviroment option }
+  (* last_env is needed in case we want to show variables scope after interpretation *)
   [@@deriving show {with_path= false}]
 
   let rec find_var varname = function
@@ -283,6 +283,7 @@ module Eval (M : MONADERROR) = struct
         assign n (VFunction (args, b)) false env
         >>= fun _ ->
         get_env env >>= fun en -> return @@ Some {en with last_value= VNull}
+    | Local _ -> error "Invalid local statement"
     | If if_lst -> eval_if env if_lst
     | ForNumerical (fvar, finit, body) ->
         get_env env
@@ -290,7 +291,9 @@ module Eval (M : MONADERROR) = struct
     | Block b -> create_next_env env >>= fun e -> eval_block (Some e) b
     | Return _ -> error "Unexpected return statement"
     | Break -> error "Unexpected break statement"
-    | _ -> error "Unknown statement"
+    | While (cond, body) ->
+        get_env env
+        >>= fun env -> eval_while cond body (Some {env with is_loop= true})
 
   and get_env = function
     | None -> error "Operation out of scope"
@@ -411,6 +414,20 @@ module Eval (M : MONADERROR) = struct
     get_env env.prev_env
     >>= fun pr_env -> return @@ Some {pr_env with jump_stmt= Break}
 
+  and eval_while cond body env =
+    eval_expr env cond
+    >>= fun predicate ->
+    if is_true predicate then
+      eval_stmt env body
+      >>= fun env ->
+      get_env env
+      >>= fun env ->
+      match env.jump_stmt with
+      | Break -> return @@ Some {env with jump_stmt= Default}
+      | Return -> return @@ Some {env with jump_stmt= Return}
+      | _ -> eval_while cond body (Some env)
+    else return env
+
   and eval_for fvar finit body env =
     let check_expr_number env num =
       eval_expr env num
@@ -449,6 +466,7 @@ module Eval (M : MONADERROR) = struct
         >>= fun env ->
         match env.jump_stmt with
         | Break -> return @@ Some {env with jump_stmt= Default}
+        | Return -> return @@ Some {env with jump_stmt= Return}
         | _ -> helper (start +. step) stop step body (Some env) in
     match finit with
     | [start; stop; step] -> helper start stop step body env
