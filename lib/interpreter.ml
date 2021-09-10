@@ -1,5 +1,6 @@
 open Ast
 open Hashtbl_p
+open Var_zipper
 
 module type MONAD = sig
   type 'a t
@@ -189,14 +190,6 @@ module Eval (M : MONADERROR) = struct
     | _ -> error "Attempt to index non-table value"
 
   and func_call env fname fargs =
-    let create_vardec lnames lexprs =
-      let rec helper l1 l2 acc =
-        match (l1, l2) with
-        | [], [] -> acc
-        | hd1 :: tl1, hd2 :: tl2 -> (hd1, hd2) :: helper tl1 tl2 acc
-        | hd1 :: tl1, [] -> (hd1, Const VNull) :: helper tl1 [] acc
-        | [], _ :: _ -> acc in
-      helper lnames lexprs [] in
     find_var fname env
     >>= function
     | VFunction (name_args, body) ->
@@ -204,7 +197,7 @@ module Eval (M : MONADERROR) = struct
         let block_with_vardec = function
           | Block b ->
               return
-              @@ Block (Local (VarDec (create_vardec var_args fargs)) :: b)
+              @@ Block (Local (VarDec (var_zipper var_args fargs)) :: b)
           | _ -> error "Expected function body" in
         block_with_vardec body
         >>= fun b ->
