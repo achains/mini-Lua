@@ -282,11 +282,10 @@ module Eval (M : MONADERROR) = struct
         match Hashtbl.find_opt env.vars n with
         | None -> set_global n v pe
         | Some _ -> Hashtbl.replace env.vars n v ) in
-    match env with
-    | None -> error "Operation out of scope"
-    | Some e ->
-        if is_global then (set_global n v e; return env)
-        else (Hashtbl.replace e.vars n v; return env)
+    get_env env
+    >>= fun e ->
+    if is_global then (set_global n v e; return env)
+    else (Hashtbl.replace e.vars n v; return env)
 
   and eval_if env = function
     | [] -> return env
