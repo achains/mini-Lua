@@ -35,10 +35,12 @@ module Eval (M : MONADERROR) = struct
         true
       with Failure _ -> false in
     match (x, y) with
-    | VNumber x, VNumber y -> Ok (x, y)
-    | VNumber x, VString y when string_is_number y -> Ok (x, float_of_string y)
-    | VString x, VNumber y when string_is_number x -> Ok (float_of_string x, y)
-    | _ -> Error err_msg
+    | VNumber x, VNumber y -> return (x, y)
+    | VNumber x, VString y when string_is_number y ->
+        return (x, float_of_string y)
+    | VString x, VNumber y when string_is_number x ->
+        return (float_of_string x, y)
+    | _ -> error err_msg
 
   (* Integer division *)
   let ( /// ) x y = Float.floor (x /. y)
@@ -123,10 +125,9 @@ module Eval (M : MONADERROR) = struct
         eval_expr env rhs
         >>= fun e_rhs ->
         match get_op op with
-        | op, err_msg -> (
-          match transform_to_number e_lhs e_rhs err_msg with
-          | Ok (x, y) -> return @@ VNumber (op x y)
-          | Error msg -> error msg ) )
+        | op, err_msg ->
+            transform_to_number e_lhs e_rhs err_msg
+            >>= fun (x, y) -> return @@ VNumber (op x y) )
     | RelOp (op, lhs, rhs) ->
         eval_expr env lhs
         >>= fun e_lhs ->
