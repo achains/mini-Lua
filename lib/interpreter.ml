@@ -95,7 +95,6 @@ module Eval (M : MONADERROR) = struct
   type environment =
     { vars: variables
     ; last_value: value
-    ; prev_env: environment option
     ; is_func: bool
     ; is_loop: bool
     ; jump_stmt: jump_statement
@@ -280,7 +279,6 @@ module Eval (M : MONADERROR) = struct
         return
           [ { vars= Hashtbl.create 16
             ; last_value= VNull
-            ; prev_env= None
             ; is_func= false
             ; is_loop= false
             ; jump_stmt= Default
@@ -367,12 +365,6 @@ module Eval (M : MONADERROR) = struct
             >>= fun prev_env -> set_hd_jump_stmt Return prev_env
         | Break -> eval_break env_lst
         | _ -> eval_block env_lst tl )
-
-  (* === This function sets last environment to show as a result of interpreter === *)
-  and set_last_env env =
-    match env.prev_env with
-    | None -> print_string (show_environment env)
-    | Some _ -> ()
 
   and eval_return env_lst e =
     eval_expr env_lst e
