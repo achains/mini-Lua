@@ -1,0 +1,59 @@
+open Hashtbl_p
+
+type arop = Sum | Sub | Mul | Div | FDiv | Mod
+[@@deriving show {with_path= false}]
+
+type logop = And | Or [@@deriving show {with_path= false}]
+type unop = Not [@@deriving show {with_path= false}]
+
+type relop = Eq | Neq | Le | Leq | Ge | Geq
+[@@deriving show {with_path= false}]
+
+type name = string [@@deriving show {with_path= false}]
+
+type value =
+  | VBool of bool
+  | VNumber of float
+  | VString of string
+  | VTable of (name, value) Hashtbl_p.t
+  (* name list -- function arguments, statement -- function body*)
+  | VFunction of name list * statement
+  | VNull
+[@@deriving show {with_path= false}]
+
+and expr =
+  | Const of value
+  | Var of name
+  | ArOp of arop * expr * expr
+  | LogOp of logop * expr * expr
+  | UnOp of unop * expr
+  | RelOp of relop * expr * expr
+  (* name[expr], where 'name' is name of the table *)
+  | TableAccess of name * expr
+  (* https://www.lua.org/pil/3.6.html *)
+  | TableCreate of expr list
+  (* name([expr list]), where 'name' is name of the function and 'expr list' is passed arguments*)
+  | CallFunc of name * expr list
+  | Assign of expr * expr
+[@@deriving show {with_path= false}]
+
+and statement =
+  (* if expr1 then stmt1 elseif expr2 then stmt2 end*)
+  (* [(expr1, stmt1); (expr2, stmt2); ...]*)
+  | If of (expr * statement) list
+  (* while expr do statement end *)
+  | While of expr * statement
+  (* for i = 1, 5, 2 do ... end *)
+  (* name -- loop variable; expr list -- 'from', 'to', ['step']; statement -- loop body *)
+  | ForNumerical of name * expr list * statement
+  | Break
+  (* https://www.lua.org/pil/4.2.html *)
+  | Local of statement
+  | Return of expr
+  (* x, y, t[1] = true, false *)
+  | VarDec of (expr * expr) list
+  | Expression of expr
+  | Block of statement list
+  (* name -- name of function, name list -- function arguments, statement -- function body*)
+  | FuncDec of name * name list * statement
+[@@deriving show {with_path= false}]
