@@ -323,10 +323,10 @@ module Eval (M : MONADERROR) = struct
     | hd :: tl -> (
       match hd with
       | If (cond, st) | Elif (cond, st) ->
-        eval_expr env_lst cond
-        >>= fun cond ->
-        if is_true cond then eval_stmt env_lst st else eval_if env_lst tl
-      | Else st -> eval_stmt env_lst st)
+          eval_expr env_lst cond
+          >>= fun cond ->
+          if is_true cond then eval_stmt env_lst st else eval_if env_lst tl
+      | Else st -> eval_stmt env_lst st )
 
   and eval_block env_lst = function
     | [] -> return @@ get_prev_env env_lst

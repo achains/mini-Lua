@@ -21,8 +21,8 @@ type value =
   | VNull
 [@@deriving show {with_path= false}]
 
-and if_stmt = 
-  | If of expr * statement 
+and if_stmt =
+  | If of expr * statement
   | Elif of expr * statement
   | Else of statement
 
