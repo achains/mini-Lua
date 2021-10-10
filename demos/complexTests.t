@@ -42,19 +42,20 @@ Complex tests of lua interpreter available features
                     ]);
                (ForNumerical ("i", [(Const (VNumber 0.)); (Var "upper_bound")],
                   (Block
-                     [(If
-                         [((TableAccess ("sieve", (Var "i"))),
-                           (Block
-                              [(ForNumerical ("j",
-                                  [(ArOp (Mul, (Var "i"), (Var "i")));
-                                    (Var "upper_bound"); (Var "i")],
-                                  (Block
-                                     [(VarDec
-                                         [((TableAccess ("sieve", (Var "j"))),
-                                           (Const (VBool false)))])
-                                       ])
-                                  ))
-                                ]))
+                     [(IfElseBlock
+                         [(If ((TableAccess ("sieve", (Var "i"))),
+                             (Block
+                                [(ForNumerical ("j",
+                                    [(ArOp (Mul, (Var "i"), (Var "i")));
+                                      (Var "upper_bound"); (Var "i")],
+                                    (Block
+                                       [(VarDec
+                                           [((TableAccess ("sieve", (Var "j"))),
+                                             (Const (VBool false)))])
+                                         ])
+                                    ))
+                                  ])
+                             ))
                            ])
                        ])
                   ));
@@ -278,9 +279,10 @@ Complex tests of lua interpreter available features
     [["fac" ->
        (VFunction (["n"],
           (Block
-             [(If
-                 [((RelOp (Leq, (Var "n"), (Const (VNumber 1.)))),
-                   (Block [(Return (Const (VNumber 1.)))]))]);
+             [(IfElseBlock
+                 [(If ((RelOp (Leq, (Var "n"), (Const (VNumber 1.)))),
+                     (Block [(Return (Const (VNumber 1.)))])))
+                   ]);
                (Return
                   (ArOp (Mul,
                      (CallFunc ("fac",
