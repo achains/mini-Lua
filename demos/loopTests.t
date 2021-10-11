@@ -4,7 +4,7 @@
   { vars = [["s" -> (VNumber 100.)
     
   ]]
-  ; last_value = VNull; is_func = false; is_loop = true; jump_stmt = Default
+  ; last_value = VNull; is_func = false; is_loop = false; jump_stmt = Default
   }
   $ ./demoWhile.exe
   { vars =
@@ -43,5 +43,5 @@
   { vars = [["s" -> (VNumber 1.)
     
   ]]
-  ; last_value = VNull; is_func = false; is_loop = true; jump_stmt = Default
+  ; last_value = VNull; is_func = false; is_loop = false; jump_stmt = Default
   }

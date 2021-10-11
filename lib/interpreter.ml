@@ -250,9 +250,7 @@ module Eval (M : MONADERROR) = struct
 
   and eval_stmt env_lst = function
     | Expression e ->
-        eval_expr env_lst e
-        >>= fun v ->
-        set_hd_last_value v env_lst
+        eval_expr env_lst e >>= fun v -> set_hd_last_value v env_lst
     | VarDec el -> eval_vardec true env_lst el
     | Local (VarDec el) -> eval_vardec false env_lst el
     | FuncDec (n, args, b) ->
@@ -373,7 +371,13 @@ module Eval (M : MONADERROR) = struct
 
   and eval_break env_lst =
     let prev_env = get_prev_env env_lst in
-    set_hd_jump_stmt Break prev_env
+    set_hd_jump_stmt Break prev_env >>= fun env -> set_parents_is_loop env
+
+  and set_parents_is_loop env_lst =
+    let prev_env = get_prev_env env_lst in
+    let prev_is_loop =
+      match prev_env with [] -> false | _ -> (List.hd prev_env).is_loop in
+    set_hd_is_loop ~is_loop:prev_is_loop env_lst
 
   and eval_while cond body env_lst =
     eval_expr env_lst cond
@@ -387,7 +391,7 @@ module Eval (M : MONADERROR) = struct
       | Break -> set_hd_jump_stmt Default env_lst
       | Return -> set_hd_jump_stmt Return env_lst
       | _ -> eval_while cond body env_lst
-    else return env_lst
+    else set_parents_is_loop env_lst
 
   and eval_for fvar finit body env_lst =
     let check_expr_number env_lst num =
@@ -418,7 +422,9 @@ module Eval (M : MONADERROR) = struct
           @@ Block (create_local_vardec (Var fvar) (Const (VNumber start)) :: b)
       | _ -> error "Expected for body" in
     let rec helper start stop step body env_lst =
-      if start > stop then return env_lst
+      if start > stop then
+        set_hd_jump_stmt Default env_lst
+        >>= fun env_lst -> set_parents_is_loop env_lst
       else
         declare_init fvar start body
         >>= fun body_with_init ->

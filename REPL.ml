@@ -24,10 +24,13 @@ let rec repl env_lst buffer =
         match parsed_prog with
         | Block b -> (
           match eval_block env_lst b with
-          | Ok res -> 
-             let last_value = (List.hd res).last_value in
-             if (string_of_value last_value <> "nil") then print_endline @@ string_of_value last_value; 
-             Buffer.clear buffer; repl res buffer
+          | Ok res ->
+              let last_value = (List.hd res).last_value in
+              if string_of_value last_value <> "nil" then
+                print_endline @@ string_of_value last_value;
+              print_lst res;
+              Buffer.clear buffer;
+              repl res buffer
           | Error msg ->
               print_endline msg; Buffer.clear buffer; repl env_lst buffer )
         | _ -> () )

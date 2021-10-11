@@ -269,7 +269,7 @@ Complex tests of lua interpreter available features
   )
   
   ]]
-  ; last_value = VNull; is_func = false; is_loop = true; jump_stmt = Default
+  ; last_value = VNull; is_func = false; is_loop = false; jump_stmt = Default
   }
 
   $ ./demoFactorial.exe
