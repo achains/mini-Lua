@@ -25,6 +25,5 @@ If-else control stucture tests
   "result" -> (VNumber 2.)
   
   ]]
-  ; last_value = VNull; is_func = false; is_loop = false; jump_stmt = Default;
-  last_env = None
+  ; last_value = VNull; is_func = false; is_loop = false; jump_stmt = Default
   }

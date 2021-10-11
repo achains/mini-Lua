@@ -97,9 +97,7 @@ module Eval (M : MONADERROR) = struct
     ; last_value: value
     ; is_func: bool
     ; is_loop: bool
-    ; jump_stmt: jump_statement
-    ; last_env: environment option }
-  (* last_env is needed in case we want to show variables scope after interpretation *)
+    ; jump_stmt: jump_statement }
   [@@deriving show {with_path= false}]
 
   type env_lst = environment list
@@ -254,7 +252,7 @@ module Eval (M : MONADERROR) = struct
     | Expression e ->
         eval_expr env_lst e
         >>= fun v ->
-        set_hd_last_value v env_lst >>= fun env_lst -> return env_lst
+        set_hd_last_value v env_lst
     | VarDec el -> eval_vardec true env_lst el
     | Local (VarDec el) -> eval_vardec false env_lst el
     | FuncDec (n, args, b) ->
@@ -281,8 +279,7 @@ module Eval (M : MONADERROR) = struct
             ; last_value= VNull
             ; is_func= false
             ; is_loop= false
-            ; jump_stmt= Default
-            ; last_env= None } ]
+            ; jump_stmt= Default } ]
     | hd_env :: tl ->
         return @@ ({hd_env with vars= Hashtbl.create 16} :: hd_env :: tl)
 
