@@ -457,5 +457,8 @@ open Eval (Result)
 
 let eval parsed_prog =
   match eval_prog parsed_prog with
-  | Ok res -> print_endline @@ show_environment @@ List.hd res
+  | Ok res -> (
+    match res with
+    | hd :: _ -> print_endline @@ show_environment hd
+    | [] -> print_endline "[]" )
   | Error msg -> print_endline msg
