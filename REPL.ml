@@ -1,8 +1,50 @@
 open Lua_lib.Interpreter
 open Lua_lib.Parser
-
-(* REMOVE THIS MADNESS *)
 open Eval (Result)
+
+
+let stdlib =
+  {|
+  function abs(x)
+    if x >= 0 then
+      return x
+    else
+      return -x
+    end
+  end
+
+  function gcd(a, b)
+    while a > 0 and b > 0 do 
+       if a > b then
+         a = a % b
+       else 
+         b = b % a 
+       end
+    end
+    return a + b 
+  end
+  
+  function fib(n)
+    if n <= 1 then return n end
+    local fib0, fib1, fib = 0, 1, 0
+    for i = 1, n - 1 do
+      fib = fib0 + fib1
+      fib0, fib1 = fib1, fib
+    end
+    return fib
+  end
+
+  function pow(x, n)
+    if n == 0 then 
+      return 1
+    end
+    if n % 2 == 1 then 
+      return x * pow(x, n - 1)
+    end
+    local fp = pow(x, n // 2)
+    return fp * fp
+  end
+  |}
 
 let rec print_lst = function
   | [] -> print_endline "[]\n=======\n"
@@ -28,7 +70,6 @@ let rec repl env_lst buffer =
               let last_value = (List.hd res).last_value in
               if string_of_value last_value <> "nil" then
                 print_endline @@ string_of_value last_value;
-              print_lst res;
               Buffer.clear buffer;
               repl res buffer
           | Error msg ->
@@ -45,11 +86,11 @@ let rec repl env_lst buffer =
 let () =
   print_endline "===== Lua REPL =====";
   print_endline "Each command should end with '@' character";
-  let initial_env =
-    [ { vars= Hashtbl.create 16
-      ; last_value= VNull
-      ; is_func= false
-      ; is_loop= false
-      ; jump_stmt= Default } ] in
   let buffer = Buffer.create 1024 in
-  repl initial_env buffer
+  match PStatement.parse_prog stdlib with
+  | Some parsed_library -> (
+    match (eval_stmt [] parsed_library) with 
+    | Ok env -> repl env buffer
+    | Error _ -> print_endline "Error: Couldn't evaluate standart library"
+    )
+  | None -> print_endline "Error: Couldn't load standart library"
