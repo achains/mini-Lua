@@ -8,7 +8,7 @@
 
 (executable
  (name REPL)
- (public_name REPL)
+ (public_name Lua.Repl)
  (modules REPL)
  (libraries Lua.Lib)
  (preprocess
