@@ -21,10 +21,11 @@ let%test _ = apply const_string "\"\"" = Some (Const (VString ""))
 
 let%test _ =
   apply create_table "{a = 5}"
-  = Some (TableCreate [Assign (Var "a", Const (VNumber 5.))])
+  = Some (TableCreate [Assign (Const (VString "a"), Const (VNumber 5.))])
 
 let%test _ =
-  apply table_access "data[3]" = Some (TableAccess ("data", Const (VNumber 3.)))
+  apply table_access "data[3]"
+  = Some (TableAccess ("data", [Const (VNumber 3.)]))
 
 let%test _ =
   apply expr "-5" = Some (ArOp (Sub, Const (VNumber 0.), Const (VNumber 5.)))
@@ -33,7 +34,10 @@ let%test _ = apply expr "a = 5" = Some (Assign (Var "a", Const (VNumber 5.)))
 
 let%test _ =
   apply expr "a = {b = 5}"
-  = Some (Assign (Var "a", TableCreate [Assign (Var "b", Const (VNumber 5.))]))
+  = Some
+      (Assign
+         ( Var "a"
+         , TableCreate [Assign (Const (VString "b"), Const (VNumber 5.))] ) )
 
 let%test _ =
   apply call_func "foo   (a=3, 5)"
@@ -88,24 +92,23 @@ let%test _ = apply for_num_stmt "for i = 1 do 1 end" = None
 let%test _ =
   apply if_stmt "if true then false elseif false then true false else false end"
   = Some
-      (IfElseBlock
-         [ If (Const (VBool true), Block [Expression (Const (VBool false))])
-         ; Elif
-             ( Const (VBool false)
+      (IfStatement
+         ( (Const (VBool true), Block [Expression (Const (VBool false))])
+         , [ ( Const (VBool false)
              , Block
                  [ Expression (Const (VBool true))
-                 ; Expression (Const (VBool false)) ] )
-         ; Else (Block [Expression (Const (VBool false))]) ] )
+                 ; Expression (Const (VBool false)) ] ) ]
+         , Some (Block [Expression (Const (VBool false))]) ) )
 
 let%test _ = apply if_stmt "if true then false" = None
 
 let%test _ =
   apply if_stmt "if true then false elseif false then false end"
   = Some
-      (IfElseBlock
-         [ If (Const (VBool true), Block [Expression (Const (VBool false))])
-         ; Elif (Const (VBool false), Block [Expression (Const (VBool false))])
-         ] )
+      (IfStatement
+         ( (Const (VBool true), Block [Expression (Const (VBool false))])
+         , [(Const (VBool false), Block [Expression (Const (VBool false))])]
+         , None ) )
 
 let%test _ =
   apply if_stmt "if true then false else false elseif true then false end"
@@ -140,11 +143,11 @@ let%test _ =
              ( "fact"
              , ["n"]
              , Block
-                 [ IfElseBlock
-                     [ If
-                         ( RelOp (Eq, Var "n", Const (VNumber 0.))
-                         , Block [Return (Const (VNumber 1.))] )
-                     ; Else
+                 [ IfStatement
+                     ( ( RelOp (Eq, Var "n", Const (VNumber 0.))
+                       , Block [Return (Const (VNumber 1.))] )
+                     , []
+                     , Some
                          (Block
                             [ Return
                                 (ArOp
@@ -154,7 +157,7 @@ let%test _ =
                                        ( "fact"
                                        , [ ArOp
                                              (Sub, Var "n", Const (VNumber 1.))
-                                         ] ) ) ) ] ) ] ] )
+                                         ] ) ) ) ] ) ) ] )
          ; VarDec
              [ ( Var "data"
                , TableCreate
@@ -167,7 +170,7 @@ let%test _ =
                , ArOp
                    ( Sum
                    , Var "s"
-                   , CallFunc ("fact", [TableAccess ("data", Var "i")]) ) ) ]
+                   , CallFunc ("fact", [TableAccess ("data", [Var "i"])]) ) ) ]
          ; ForNumerical
              ( "i"
              , [Const (VNumber 1.); Const (VNumber 7.)]
@@ -177,7 +180,7 @@ let%test _ =
                        , ArOp
                            ( Sum
                            , Var "s"
-                           , CallFunc ("fact", [TableAccess ("data", Var "i")])
+                           , CallFunc ("fact", [TableAccess ("data", [Var "i"])])
                            ) ) ] ] ) ] )
 
 let%test _ =

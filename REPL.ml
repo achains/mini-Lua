@@ -2,7 +2,6 @@ open Lua_lib.Interpreter
 open Lua_lib.Parser
 open Eval (Result)
 
-
 let stdlib =
   {|
   function abs(x)
@@ -89,8 +88,7 @@ let () =
   let buffer = Buffer.create 1024 in
   match PStatement.parse_prog stdlib with
   | Some parsed_library -> (
-    match (eval_stmt [] parsed_library) with 
+    match eval_stmt [] parsed_library with
     | Ok env -> repl env buffer
-    | Error _ -> print_endline "Error: Couldn't evaluate standart library"
-    )
+    | Error _ -> print_endline "Error: Couldn't evaluate standart library" )
   | None -> print_endline "Error: Couldn't load standart library"
